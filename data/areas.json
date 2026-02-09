@@ -1,0 +1,212 @@
+{
+  "areas": [
+    {
+      "area_id": "yushan",
+      "name": "玉山群峰",
+      "description": "台灣第一高峰玉山主峰（3952m），包含玉山前峰、東峰、北峰、西峰等群峰，及八通關古道",
+      "country": "台灣",
+      "bbox": [23.45, 120.85, 23.50, 120.98],
+      "elevation_range": [2400, 3952],
+      "trail_count": 15,
+      "peak_count": 8,
+      "hut_count": 3,
+      "features": ["百岳", "國家公園", "高山步道", "山屋"],
+      "difficulty": "困難",
+      "popular_trails": ["玉山主峰線", "八通關古道", "玉山前峰"],
+      "routes": [
+        {
+          "route_id": "yushan_main",
+          "name": "玉山主峰單攻/二日",
+          "description": "從塔塔加登山口經排雲山莊至玉山主峰，台灣最熱門的百岳路線",
+          "days": 2,
+          "difficulty": "困難",
+          "total_distance": 21.2,
+          "trailhead": {
+            "name": "塔塔加登山口",
+            "lat": 23.4690,
+            "lon": 120.9070,
+            "elevation": 2610,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "排雲山莊",
+              "lat": 23.4720,
+              "lon": 120.9130,
+              "elevation": 3402,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "玉山主峰",
+              "lat": 23.4700,
+              "lon": 120.9570,
+              "elevation": 3952,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "10-12小時",
+          "highlight": "台灣第一高峰，日出景觀絕美"
+        }
+      ]
+    },
+    {
+      "area_id": "hehuanshan",
+      "name": "合歡山群峰",
+      "description": "台灣最容易親近的高山區域，包含合歡主峰、東峰、北峰、西峰、石門山等，有台14甲線公路通達",
+      "country": "台灣",
+      "bbox": [24.10, 121.25, 24.20, 121.32],
+      "elevation_range": [3100, 3422],
+      "trail_count": 10,
+      "peak_count": 6,
+      "hut_count": 2,
+      "features": ["百岳", "公路可達", "賞雪勝地", "觀星"],
+      "difficulty": "中等",
+      "popular_trails": ["石門山步道", "合歡主峰", "合歡東峰"],
+      "routes": [
+        {
+          "route_id": "hehuan_shimenshan",
+          "name": "石門山步道",
+          "description": "最輕鬆的百岳，適合親子同行，30分鐘登頂",
+          "days": 1,
+          "difficulty": "簡單",
+          "total_distance": 1.6,
+          "trailhead": {
+            "name": "石門山登山口",
+            "lat": 24.1420,
+            "lon": 121.2890,
+            "elevation": 3200,
+            "type": "trailhead",
+            "facilities": ["停車場"]
+          },
+          "waypoints": [
+            {
+              "name": "石門山",
+              "lat": 24.1450,
+              "lon": 121.2920,
+              "elevation": 3237,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "1小時",
+          "highlight": "最容易親近的百岳，360度展望"
+        },
+        {
+          "route_id": "hehuan_main_east",
+          "name": "合歡主東峰連走",
+          "description": "從武嶺出發，連走合歡主峰和東峰，適合單日行程",
+          "days": 1,
+          "difficulty": "中等",
+          "total_distance": 7.8,
+          "trailhead": {
+            "name": "武嶺停車場",
+            "lat": 24.1420,
+            "lon": 121.2750,
+            "elevation": 3275,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所", "商店"]
+          },
+          "waypoints": [
+            {
+              "name": "合歡主峰",
+              "lat": 24.1420,
+              "lon": 121.2720,
+              "elevation": 3417,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "合歡東峰",
+              "lat": 24.1460,
+              "lon": 121.2810,
+              "elevation": 3421,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "5-6小時",
+          "highlight": "一次攻下兩座百岳，展望極佳"
+        }
+      ]
+    },
+    {
+      "area_id": "xueshan",
+      "name": "雪山主峰、東峰",
+      "description": "台灣第二高峰（3886m），雪山山脈主峰，有著名的黑森林及雪山圈谷",
+      "country": "台灣",
+      "bbox": [24.35, 121.20, 24.42, 121.28],
+      "elevation_range": [2100, 3886],
+      "trail_count": 8,
+      "peak_count": 4,
+      "hut_count": 2,
+      "features": ["百岳", "圈谷地形", "黑森林", "山屋"],
+      "difficulty": "困難",
+      "popular_trails": ["雪山主東峰線", "雪山西稜"],
+      "routes": [
+        {
+          "route_id": "xueshan_main_east",
+          "name": "雪山主東峰線",
+          "description": "從武陵農場登山口經七卡山莊、雪山東峰至雪山主峰，經典兩日行程",
+          "days": 2,
+          "difficulty": "困難",
+          "total_distance": 21.0,
+          "trailhead": {
+            "name": "武陵農場登山口",
+            "lat": 24.3520,
+            "lon": 121.3080,
+            "elevation": 2140,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所", "補給站"]
+          },
+          "waypoints": [
+            {
+              "name": "七卡山莊",
+              "lat": 24.3720,
+              "lon": 121.2950,
+              "elevation": 2463,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "雪山東峰",
+              "lat": 24.3850,
+              "lon": 121.2620,
+              "elevation": 3201,
+              "type": "peak",
+              "required": false
+            },
+            {
+              "name": "雪山主峰",
+              "lat": 24.3880,
+              "lon": 121.2330,
+              "elevation": 3886,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "10-12小時",
+          "highlight": "台灣第二高峰，黑森林、圈谷美景"
+        }
+      ]
+    },
+    {
+      "area_id": "test_region",
+      "name": "測試區域",
+      "description": "開發測試用的小區域",
+      "country": "台灣",
+      "bbox": [23.4, 120.9, 23.5, 121.0],
+      "elevation_range": [1000, 3000],
+      "trail_count": 5,
+      "peak_count": 3,
+      "hut_count": 1,
+      "features": ["測試"],
+      "difficulty": "中等",
+      "popular_trails": ["測試步道"]
+    }
+  ]
+}
