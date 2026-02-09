@@ -76,7 +76,7 @@ def segment_to_response(segment: RouteSegment) -> RouteSegmentResponse:
         elevation_gain=segment.elevation_gain,
         elevation_loss=segment.elevation_loss,
         estimated_time=segment.estimated_time,
-        difficulty=segment.difficulty.value,
+        difficulty=segment.difficulty.name.lower(),
         trail_name=segment.edge.trail_name
     )
 
@@ -92,7 +92,7 @@ def day_plan_to_response(day: DayPlan) -> DayPlanResponse:
         total_elevation_gain=day.total_elevation_gain,
         total_elevation_loss=day.total_elevation_loss,
         estimated_time=day.estimated_time,
-        difficulty=day.difficulty.value,
+        difficulty=day.difficulty.name.lower(),
         overnight_stop=node_to_response(day.overnight_stop) if day.overnight_stop else None
     )
 
@@ -247,7 +247,7 @@ async def plan_route(
             total_elevation_gain=route.total_elevation_gain,
             total_elevation_loss=route.total_elevation_loss,
             estimated_time=time_estimate,
-            difficulty=route.difficulty.value,
+            difficulty=route.difficulty.name.lower(),
             is_loop=route.is_loop,
             waypoints=[node_to_response(w) for w in route.waypoints],
             multi_day=request.multi_day,
@@ -328,7 +328,7 @@ async def get_route(
         total_elevation_gain=route.total_elevation_gain,
         total_elevation_loss=route.total_elevation_loss,
         estimated_time=time_estimate,
-        difficulty=route.difficulty.value,
+        difficulty=route.difficulty.name.lower(),
         is_loop=route.is_loop,
         waypoints=[node_to_response(w) for w in route.waypoints],
         multi_day=multi_day_plan is not None

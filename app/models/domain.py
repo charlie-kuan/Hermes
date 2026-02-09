@@ -1,7 +1,7 @@
 """Core domain models for hiking routes and trail networks."""
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import List, Optional, Tuple
 
 
@@ -17,12 +17,12 @@ class NodeType(Enum):
     GENERIC = "generic"
 
 
-class TrailDifficulty(Enum):
+class TrailDifficulty(IntEnum):
     """Trail difficulty levels based on SAC scale."""
-    EASY = "easy"  # T1: hiking, sac_scale=hiking
-    MODERATE = "moderate"  # T2: mountain_hiking
-    DIFFICULT = "difficult"  # T3: demanding_mountain_hiking
-    EXPERT = "expert"  # T4+: alpine_hiking
+    EASY = 1  # T1: hiking, sac_scale=hiking
+    MODERATE = 2  # T2: mountain_hiking
+    DIFFICULT = 3  # T3: demanding_mountain_hiking
+    EXPERT = 4  # T4+: alpine_hiking
 
 
 class FitnessLevel(Enum):

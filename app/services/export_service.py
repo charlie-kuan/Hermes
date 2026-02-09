@@ -39,7 +39,7 @@ class ExportService:
             f"Distance: {route.total_distance:.1f} km, "
             f"Elevation Gain: {route.total_elevation_gain:.0f} m, "
             f"Estimated Time: {route.estimated_time:.1f} hours, "
-            f"Difficulty: {route.difficulty.value}"
+            f"Difficulty: {route.difficulty.name.lower()}"
         )
         gpx.author_name = "Project Hermes"
         gpx.time = datetime.utcnow()
@@ -152,7 +152,7 @@ class ExportService:
                 "elevation_gain_m": round(route.total_elevation_gain, 0),
                 "elevation_loss_m": round(route.total_elevation_loss, 0),
                 "estimated_time_hours": round(route.estimated_time, 1),
-                "difficulty": route.difficulty.value,
+                "difficulty": route.difficulty.name.lower(),
                 "is_loop": route.is_loop,
                 "stroke": "#FF5733",
                 "stroke-width": 3

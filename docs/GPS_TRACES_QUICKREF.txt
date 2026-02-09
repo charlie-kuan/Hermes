@@ -1,0 +1,264 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              GPS TRACES 主要資料來源 + 路線切割 - 快速參考卡                    ║
+║                          版本 0.3.0 - 2026-02-09                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📌 核心概念
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ GPS traces 可作為主要資料來源（不只是輔助）
+  ✓ 解決 OSM trail way 資料不足的問題
+  ✓ 起終點可在路徑上任意位置（自動切割）
+  ✓ 愈多人走過 = GPS 軌跡密度高 = 受歡迎度高
+
+
+🆕 新功能解決的問題
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  問題 1: Trail way 資料太少 ❌
+  解決: 直接從 GPS traces 建立圖資 ✅
+  
+  問題 2: 起終點必須在節點上 ❌  
+  解決: 自動切割路徑建立節點 ✅
+
+
+🎯 三種使用策略
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  策略 1: OSM 為主，GPS 輔助 (原有方式)
+  適用: OSM 資料完整的區域
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ graph = graph_service.get_or_build_graph("area", bbox)                │
+  │ graph_service.enrich_with_gps_traces(graph, "area", blend_factor=0.7) │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  策略 2: GPS 為主 (新功能) 🆕
+  適用: OSM 資料不足的區域
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ graph = graph_service.build_graph_from_gps_traces("area")             │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  策略 3: 合併兩者 (推薦) 🆕
+  適用: 想要最完整資料
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ osm_graph = graph_service.get_or_build_graph("area", bbox)            │
+  │ gps_graph = graph_service.build_graph_from_gps_traces("area")         │
+  │ graph = graph_service.merge_graphs(osm_graph, gps_graph)              │
+  └────────────────────────────────────────────────────────────────────────┘
+
+
+📂 目錄結構
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  data/
+    gps_traces/
+      yushan/          ← 玉山區域
+        *.gpx          ← GPX 檔案
+        *.geojson      ← GeoJSON 檔案
+      hehuan/          ← 合歡山區域
+      xueshan/         ← 雪山區域
+
+
+🔧 完整範例：靈活起終點的路線規劃
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ from app.services.graph_service import GraphService                    │
+  │ from app.services.routing_service import RoutingService                │
+  │                                                                         │
+  │ # 初始化                                                                │
+  │ graph_service = GraphService()                                         │
+  │ routing_service = RoutingService(graph_service)                        │
+  │                                                                         │
+  │ # 建立圖資（選擇策略 1, 2 或 3）                                         │
+  │ graph = graph_service.build_graph_from_gps_traces("yushan")            │
+  │                                                                         │
+  │ # 使用者的 GPS 位置（不在節點上也沒關係！）                              │
+  │ user_lat, user_lon = 23.4750, 120.8650                                 │
+  │ dest_lat, dest_lon = 23.4800, 120.8700                                 │
+  │                                                                         │
+  │ # 自動找到或建立節點（會切割路徑）🆕                                     │
+  │ start_node = graph_service.find_or_create_node_at_point(               │
+  │     graph, user_lat, user_lon, split_edges=True                        │
+  │ )                                                                       │
+  │ end_node = graph_service.find_or_create_node_at_point(                 │
+  │     graph, dest_lat, dest_lon, split_edges=True                        │
+  │ )                                                                       │
+  │                                                                         │
+  │ # 規劃路線                                                              │
+  │ if start_node and end_node:                                            │
+  │     route = routing_service.plan_route(                                │
+  │         graph, start_node, end_node,                                   │
+  │         preferences={'popularity': 0.7}                                │
+  │     )                                                                   │
+  └────────────────────────────────────────────────────────────────────────┘
+
+
+📊 API 快查表
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  功能                                方法                            新功能
+  ──────────────────────────────────────────────────────────────────────────
+  從 GPS 建立圖資                    build_graph_from_gps_traces()      🆕
+  豐富現有圖資                       enrich_with_gps_traces()           ✓
+  合併兩個圖資                       merge_graphs()                     🆕
+  找/建節點(會切割)                  find_or_create_node_at_point()     🆕
+  找最近的邊                         find_nearest_edge()                🆕
+  切割邊                             split_edge_at_point()              🆕
+  找最近節點                         find_nearest_node()                ✓
+
+
+⚙️ 重要參數
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  參數名稱                   預設值     說明
+  ──────────────────────────────────────────────────────────────────
+  blend_factor             0.7        GPS 權重 (0=純OSM, 1=純GPS)
+  simplify_tolerance       0.0001     簡化容忍度 ≈ 11 公尺
+  intersection_threshold   50.0       交叉點閾值 (公尺)
+  max_distance             100.0      最大搜尋距離 (公尺)
+  split_edges              True       是否允許切割邊
+  buffer_distance          30.0       匹配緩衝距離 (公尺)
+
+
+📈 評分對照表
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  軌跡數量      popularity 分數      說明                    圖示
+  ──────────────────────────────────────────────────────────────────
+  0 條          0.5                 無人走過/未記錄          🚫
+  1-2 條        0.5-1.0             較少人走                ⚪
+  3-10 條       1.0-1.5             中等受歡迎度            ⭐
+  11-30 條      1.5-2.0             很熱門                  ⭐⭐
+  > 30 條       2.0-2.5             超級熱門                🔥🔥🔥
+
+
+🗺️ 資料來源
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  來源                     授權         取得方式
+  ──────────────────────────────────────────────────────────────
+  OpenStreetMap Traces     ODbL         ✅ openstreetmap.org/traces
+  個人 GPX 檔案            自訂         ✅ 從登山 app 匯出
+  Garmin/Suunto            自訂         ✅ 從裝置下載
+  Strava Heatmap           商用         🔜 需要 API
+  Wikiloc                  商用         🔜 需要 API
+
+
+💡 最佳實踐
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GPS Traces 品質:
+    ✓ 至少 10-20 條軌跡才有統計意義
+    ✓ 來自不同時間/人的軌跡更好
+    ✓ 軌跡應有一定重疊（識別主要路徑）
+    ✗ 避免 GPS 訊號差的軌跡
+
+  參數調整:
+    • simplify_tolerance: 越小越精確，但節點越多
+    • intersection_threshold: 太小漏交叉點，太大假交叉點
+    • blend_factor: 0.7 推薦（70% GPS + 30% OSM）
+    • max_distance: 超過此距離不建立/切割節點
+
+  策略選擇:
+    • OSM 資料完整 → enrich_with_gps_traces()
+    • OSM 資料不足 → build_graph_from_gps_traces()
+    • 想要最完整   → merge_graphs()
+
+
+🧪 測試腳本
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # 從 GPS traces 建立圖資 🆕
+  python scripts/build_from_gps_traces.py
+
+  # 豐富現有圖資
+  python scripts/enrich_with_gps_traces.py
+
+
+❓ 常見問題
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Q: Trail way 資料太少怎麼辦？
+  A: 使用 build_graph_from_gps_traces() 直接從 GPS traces 建立。
+
+  Q: 起終點不在節點上？
+  A: 用 find_or_create_node_at_point(split_edges=True) 自動切割。
+
+  Q: 需要多少 GPS traces？
+  A: 至少 10-20 條，越多越好。重要的是要有重疊。
+
+  Q: 可以混用 OSM 和 GPS 嗎？
+  A: 可以！用 merge_graphs() 或 enrich_with_gps_traces()。
+
+  Q: 切割邊會改變原始資料嗎？
+  A: 不會。只在記憶體中操作，不會存回快取。
+
+  Q: 效能如何？
+  A: 建圖需要時間但會快取，切割很快（< 0.01 秒）。
+
+
+🔗 相關文件
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📄 docs/GPS_TRACES_PRIMARY.md     - 📖 完整功能說明（主文件）
+  📄 docs/GPS_TRACES.md             - 📖 基礎功能文件
+  📄 docs/GPS_TRACES_IMPLEMENTATION.md  - 🔧 實作細節
+  📄 docs/ALGORITHMS.md             - 🧮 演算法說明
+
+
+🎯 下一步
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. 準備 GPS traces 檔案放到 data/gps_traces/{area_id}/
+  2. 執行 python scripts/build_from_gps_traces.py 測試
+  3. 根據需求選擇策略 1, 2 或 3
+  4. 在路線規劃中使用 find_or_create_node_at_point()
+  5. 調整參數優化結果
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  詳細說明請參考: docs/GPS_TRACES_PRIMARY.md                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  │ for u, v, key, data in graph.edges(keys=True, data=True):             │
+  │     edge = data['data']                                                │
+  │     if edge.gps_trace_count > 50:                                      │
+  │         print(f"熱門路段: {edge.trail_name} - {edge.gps_trace_count}條")│
+  └────────────────────────────────────────────────────────────────────────┘
+
+
+🔍 疑難排解
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  問題                         解決方法
+  ──────────────────────────────────────────────────────────
+  找不到 GPS 軌跡             檢查目錄: data/gps_traces/{area_id}/
+  豐富後分數沒變化            1. 增加更多軌跡檔案
+                             2. 提高 blend_factor
+  路線規劃忽略受歡迎度        確認 preferences['popularity'] > 0
+  處理速度慢                  1. 減少軌跡數量
+                             2. 調整 buffer_distance
+
+
+📖 文件連結
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📄 docs/GPS_TRACES.md                    - 完整使用指南
+  📄 docs/GPS_TRACES_IMPLEMENTATION.md     - 技術實作細節
+  📄 GPS_TRACES_UPDATE.md                  - 更新摘要
+  📄 scripts/enrich_with_gps_traces.py     - 示範腳本
+
+
+✅ 檢查清單
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  □ 已建立 data/gps_traces/{area_id}/ 目錄
+  □ 已放入 GPS 軌跡檔案（.gpx 或 .geojson）
+  □ 執行過 python scripts/enrich_with_gps_traces.py
+  □ 路線規劃時設定 preferences['popularity'] > 0
+  □ 觀察到受歡迎度影響路線選擇
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+版本: 0.2.0  |  日期: 2026-02-09  |  Project Hermes - Intelligent Hiking Routes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

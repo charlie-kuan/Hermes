@@ -48,15 +48,25 @@ class PlanningService:
 
         # Ensure route has time estimates
         if route.segments[0].estimated_time == 0:
+            logger.info("Route segments have no time estimates, calculating...")
             route = self.estimation_service.estimate_all_segments(
                 route, fitness_level, pack_weight_kg
             )
+        else:
+            logger.debug(f"Route segments already have time estimates (first segment: {route.segments[0].estimated_time:.2f}h)")
 
         # Calculate total time and estimate days needed
         total_time = route.estimated_time
         estimated_days = max(1, int(total_time / target_hours_per_day + 0.5))
 
         logger.info(f"Total time: {total_time:.1f}h, estimated days: {estimated_days}")
+        
+        # Sanity check: if estimated days is unreasonably high, there might be a bug
+        if estimated_days > 30:
+            logger.warning(
+                f"Estimated days ({estimated_days}) seems unreasonably high for total_time={total_time:.1f}h. "
+                f"This might indicate a unit conversion issue."
+            )
 
         # Split into days
         days = []
@@ -65,8 +75,41 @@ class PlanningService:
         day_number = 1
 
         for i, segment in enumerate(route.segments):
+            # Validate segment time before using it
+            if segment.estimated_time > 24:  # No single segment should take more than 24 hours
+                logger.error(
+                    f"Segment {i+1} has unreasonably high estimated_time: {segment.estimated_time:.2f}h. "
+                    f"Distance: {segment.distance:.1f}km, Elevation gain: {segment.elevation_gain:.0f}m. "
+                    f"This likely indicates a unit conversion bug (meters passed as km?)."
+                )
+                # Try to fix it: if distance seems like it's in meters, convert to km
+                if segment.distance > 100:  # Likely in meters, not km
+                    logger.warning(f"Segment distance ({segment.distance}) appears to be in meters, not km. Converting...")
+                    segment.distance = segment.distance / 1000.0
+                    # Recalculate estimated time
+                    from app.models.domain import FitnessLevel
+                    fitness = FitnessLevel(fitness_level)
+                    segment.estimated_time = self.estimation_service.time_estimator.estimate_segment_time(
+                        segment.distance,
+                        segment.elevation_gain,
+                        segment.elevation_loss,
+                        segment.difficulty,
+                        fitness,
+                        pack_weight_kg
+                    )
+                    logger.info(f"Corrected segment time: {segment.estimated_time:.2f}h")
+            
             current_day_segments.append(segment)
             cumulative_time += segment.estimated_time
+            
+            # Debug logging
+            logger.debug(
+                f"Segment {i+1}/{len(route.segments)}: "
+                f"distance={segment.distance:.3f}km, "
+                f"elev_gain={segment.elevation_gain:.0f}m, "
+                f"time={segment.estimated_time:.2f}h, "
+                f"cumulative={cumulative_time:.2f}h"
+            )
 
             # Check if we should end the day
             is_last_segment = (i == len(route.segments) - 1)
@@ -74,6 +117,13 @@ class PlanningService:
                 cumulative_time >= target_hours_per_day * 0.8 and  # At least 80% of target
                 not is_last_segment
             )
+            
+            if should_split:
+                logger.info(
+                    f"Splitting day at segment {i+1}: "
+                    f"cumulative_time={cumulative_time:.2f}h >= "
+                    f"threshold={target_hours_per_day * 0.8:.2f}h"
+                )
 
             if should_split or is_last_segment:
                 # Find overnight stop
@@ -93,6 +143,13 @@ class PlanningService:
                     overnight_node
                 )
                 days.append(day)
+                
+                logger.info(
+                    f"Created Day {day_number}: "
+                    f"{len(current_day_segments)} segments, "
+                    f"{day.total_distance:.1f}km, "
+                    f"{day.estimated_time:.2f}h"
+                )
 
                 # Reset for next day
                 current_day_segments = []
@@ -110,6 +167,13 @@ class PlanningService:
         )
 
         logger.info(f"Created {len(days)}-day plan with {len(overnight_stops)} overnight stops")
+        
+        # Final sanity check
+        if len(days) > estimated_days * 2:
+            logger.warning(
+                f"Created {len(days)} days, which is much more than estimated {estimated_days} days. "
+                f"This might indicate a problem with the splitting logic or time calculations."
+            )
 
         return multi_day_plan
 
