@@ -74,26 +74,143 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
-/* Panels */
-.left-panel,
-.right-panel {
-  width: 350px;
+/* Sidebar */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  min-width: 420px;
   background: var(--panel-bg);
+  border-right: 2px solid var(--border-color);
+  transition: all 0.3s ease;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.sidebar.closed {
+  width: 0;
+  min-width: 0;
+  border-right: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar.closed .sidebar-header {
+  opacity: 0;
+}
+
+.sidebar-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary-color);
+}
+
+.tab-button.active {
+  background: var(--primary-color);
+  color: white;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+}
+
+.sidebar-toggle {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+  margin-left: 0.5rem;
+}
+
+.sidebar-toggle:hover {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+/* Sidebar Content */
+.sidebar-content {
+  flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
-  border-right: 1px solid var(--border-color);
+  min-width: 0;
 }
 
-.right-panel {
-  border-right: none;
-  border-left: 1px solid var(--border-color);
+.sidebar.closed .sidebar-content {
+  opacity: 0;
+  overflow: hidden;
 }
 
-.center-panel {
+/* Map Section */
+.map-section {
   flex: 1;
   position: relative;
+  min-width: 0;
+}
+
+/* Floating Toggle Button */
+.floating-toggle {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+  z-index: 1001;
+}
+
+.floating-toggle:hover {
+  background: var(--primary-hover);
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* Route Form */
@@ -615,22 +732,351 @@
 
 /* Responsive */
 @media (max-width: 1200px) {
-  .left-panel, .right-panel {
-    width: 300px;
+  .sidebar {
+    width: 380px;
+    min-width: 380px;
   }
 }
 
 @media (max-width: 768px) {
-  .main-content {
-    flex-direction: column;
-  }
-
-  .left-panel, .right-panel {
+  .sidebar {
     width: 100%;
-    max-height: 40vh;
+    min-width: 100%;
+    max-width: 100%;
   }
 
-  .center-panel {
-    height: 60vh;
+  .sidebar.closed {
+    width: 0;
+    min-width: 0;
   }
+
+  .sidebar-header {
+    padding: 0.75rem;
+  }
+
+  .sidebar-content {
+    padding: 1rem;
+  }
+
+  .tab-button {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .floating-toggle {
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+  }
+}
+
+/* Point Selection Styles */
+.selected-points-list {
+  margin-bottom: 1.5rem;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.selected-points-list h4 {
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.selected-point-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.point-order {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.point-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.point-info strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.point-info small {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.point-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-color);
+  border-color: var(--primary-color);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-icon.btn-remove {
+  color: var(--danger-color);
+}
+
+.btn-icon.btn-remove:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: var(--danger-color);
+}
+
+.available-points {
+  margin-top: 1rem;
+}
+
+.available-points h4 {
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.points-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.point-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.point-card:hover {
+  border-color: var(--primary-color);
+  background: #f8fafc;
+  box-shadow: var(--shadow);
+}
+
+.point-card.selected {
+  border-color: var(--primary-color);
+  background: #eff6ff;
+}
+
+.point-card .point-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  width: 32px;
+  text-align: center;
+}
+
+.point-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.point-details strong {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.point-details small {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.checkmark {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 20px;
+  height: 20px;
+  background: var(--success-color);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+/* Point selection count badge */
+.point-card.has-selection {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.selection-count {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.point-card:hover .selection-count {
+  background: var(--primary-hover);
+}
+
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom-left .route-form form {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.bottom-left .instructions {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+/* Compact form groups for bottom layout */
+.bottom-left .form-group {
+  margin-bottom: 1rem;
+}
+
+.bottom-left .waypoints-group {
+  margin-bottom: 1rem;
+}
+
+.bottom-left .selected-points-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.bottom-left .available-points .points-grid {
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+/* Scrollable results */
+.bottom-right {
+  overflow-y: auto;
+}
+
+
+/* Sidebar-specific optimizations */
+.sidebar .route-form h2,
+.sidebar .results-panel h2 {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  font-size: 1.25rem;
+}
+
+.sidebar .selected-points-list {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.sidebar .available-points .points-grid {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.sidebar .form-group {
+  margin-bottom: 1rem;
+}
+
+.sidebar .instructions {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.sidebar .instructions h3 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.sidebar .instructions ol {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  padding-left: 1.5rem;
+}
+
+/* Smooth scrolling */
+.sidebar-content {
+  scroll-behavior: smooth;
+}
+
+.sidebar-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+  background: var(--bg-color);
+  border-radius: 4px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
 }

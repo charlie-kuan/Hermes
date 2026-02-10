@@ -125,6 +125,7 @@ export default function Map3D({
       zoom: 13,
       pitch: 0,
       bearing: 0,
+      maxPitch: 85,
       antialias: true
     });
 
@@ -392,6 +393,8 @@ export default function Map3D({
     if (!map.current || mapStyle === styleType) return;
 
     setMapStyle(styleType);
+    // Set to false to trigger route redraw after style loads
+    setIsMapLoaded(false);
     map.current.setStyle(getMapStyle(styleType));
 
     // Wait for style to load before marking as loaded

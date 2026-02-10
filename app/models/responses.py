@@ -124,18 +124,48 @@ class RouteResponse(BaseModel):
     food: Optional[FoodRecommendationResponse] = None
 
 
+class PointResponse(BaseModel):
+    """Individual point (trailhead, peak, hut, etc.) in an area."""
+    id: str
+    name: str
+    type: str  # trailhead, peak, hut, waypoint
+    lat: float
+    lon: float
+    elevation: float
+    description: Optional[str] = None
+    facilities: List[str] = Field(default_factory=list)
+    capacity: Optional[int] = None
+
+
+class RecommendedRouteResponse(BaseModel):
+    """Recommended route template."""
+    route_id: str
+    name: str
+    description: str
+    days: int
+    difficulty: str
+    estimated_distance: Optional[float] = None
+    estimated_time: Optional[str] = None
+    point_sequence: List[str]  # List of point IDs
+    highlight: Optional[str] = None
+
+
 class AreaResponse(BaseModel):
     """Hiking area information."""
     area_id: str
     name: str
     description: str
     country: str
-    bbox: Optional[List[float]] = Field(None, description="Bounding box [min_lat, min_lon, max_lat, max_lon] (legacy, auto-calculated from routes)")
     elevation_range: List[int] = Field(..., description="[min_elevation, max_elevation] in meters")
+    features: List[str] = Field(default_factory=list)
+    points: List[PointResponse] = Field(default_factory=list)
+    recommended_routes: List[RecommendedRouteResponse] = Field(default_factory=list)
+
+    # Legacy fields (optional, for backward compatibility)
+    bbox: Optional[List[float]] = Field(None, description="Bounding box [min_lat, min_lon, max_lat, max_lon]")
     trail_count: Optional[int] = None
     peak_count: Optional[int] = None
     hut_count: Optional[int] = None
-    routes: List[RouteInfo] = Field(default_factory=list)
 
 
 class AreaListResponse(BaseModel):

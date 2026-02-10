@@ -10,74 +10,49 @@ export default function RouteForm({
 }) {
   const [formData, setFormData] = useState({
     area_id: '',
-    route_id: '',
-    start_lat: '',
-    start_lon: '',
-    end_lat: '',
-    end_lon: '',
-    loop_route: false,
     multi_day: false,
     target_hours_per_day: 7,
     hiker_fitness: 'moderate',
     pack_weight_kg: 12,
-    max_distance: '',
     prefer_huts: true,
     avoid_difficult: false,
   });
 
   const [selectedArea, setSelectedArea] = useState(null);
-  const [selectedRoute, setSelectedRoute] = useState(null);
-  const [selectedWaypoints, setSelectedWaypoints] = useState([]);
+  const [selectedPoints, setSelectedPoints] = useState([]); // Array of {id: unique_id, pointId: point_id}
+  const [quickSelectRoute, setQuickSelectRoute] = useState('');
+  const [nextUniqueId, setNextUniqueId] = useState(1);
 
   // Handle area selection
   useEffect(() => {
     if (formData.area_id) {
       const area = areas.find(a => a.area_id === formData.area_id);
       setSelectedArea(area);
-      setSelectedRoute(null);
-      setSelectedWaypoints([]);
-      setFormData(prev => ({
-        ...prev,
-        route_id: '',
-        start_lat: '',
-        start_lon: '',
-        end_lat: '',
-        end_lon: '',
-      }));
+      setSelectedPoints([]);
+      setQuickSelectRoute('');
     }
   }, [formData.area_id, areas]);
 
-  // Handle route selection
+  // Handle quick route selection
   useEffect(() => {
-    if (formData.route_id && selectedArea?.routes) {
-      const route = selectedArea.routes.find(r => r.route_id === formData.route_id);
-      setSelectedRoute(route);
-      
+    if (quickSelectRoute && selectedArea) {
+      const route = selectedArea.recommended_routes?.find(r => r.route_id === quickSelectRoute);
       if (route) {
-        // Auto-fill trailhead as start point
+        // Convert point sequence to array of {id, pointId} objects
+        let uniqueId = 1;
+        const points = route.point_sequence.map(pointId => ({
+          id: uniqueId++,
+          pointId: pointId
+        }));
+        setSelectedPoints(points);
+        setNextUniqueId(uniqueId);
         setFormData(prev => ({
           ...prev,
-          start_lat: route.trailhead.lat.toFixed(5),
-          start_lon: route.trailhead.lon.toFixed(5),
-          multi_day: route.days > 1,
-          loop_route: false,
+          multi_day: route.days > 1
         }));
-        
-        // Pre-select all required waypoints
-        const required = route.waypoints.filter(w => w.required).map(w => w.name);
-        setSelectedWaypoints(required);
-        
-        // Notify parent component
-        if (onRouteSelect) onRouteSelect(route);
-        if (onWaypointsChange) onWaypointsChange(required);
       }
-    } else {
-      setSelectedRoute(null);
-      setSelectedWaypoints([]);
-      if (onRouteSelect) onRouteSelect(null);
-      if (onWaypointsChange) onWaypointsChange([]);
     }
-  }, [formData.route_id, selectedArea, onRouteSelect, onWaypointsChange]);
+  }, [quickSelectRoute, selectedArea]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -87,59 +62,97 @@ export default function RouteForm({
     }));
   };
 
-  const handleWaypointToggle = (waypointName, required) => {
-    if (required) return; // Required waypoints cannot be deselected
-    
-    setSelectedWaypoints(prev => {
-      const newWaypoints = prev.includes(waypointName)
-        ? prev.filter(w => w !== waypointName)
-        : [...prev, waypointName];
-      
-      // Notify parent component
-      if (onWaypointsChange) onWaypointsChange(newWaypoints);
-      
-      return newWaypoints;
+  const handlePointAdd = (pointId) => {
+    setSelectedPoints(prev => [...prev, { id: nextUniqueId, pointId }]);
+    setNextUniqueId(prev => prev + 1);
+    setQuickSelectRoute(''); // Clear quick select when manually changing
+  };
+
+  const handlePointRemove = (uniqueId) => {
+    setSelectedPoints(prev => prev.filter(item => item.id !== uniqueId));
+    setQuickSelectRoute(''); // Clear quick select when manually changing
+  };
+
+  const handlePointMoveUp = (index) => {
+    if (index === 0) return;
+    setSelectedPoints(prev => {
+      const newPoints = [...prev];
+      [newPoints[index - 1], newPoints[index]] = [newPoints[index], newPoints[index - 1]];
+      return newPoints;
     });
+  };
+
+  const handlePointMoveDown = (index) => {
+    if (index === selectedPoints.length - 1) return;
+    setSelectedPoints(prev => {
+      const newPoints = [...prev];
+      [newPoints[index], newPoints[index + 1]] = [newPoints[index + 1], newPoints[index]];
+      return newPoints;
+    });
+  };
+
+  const getPointById = (pointId) => {
+    return selectedArea?.points.find(p => p.id === pointId);
+  };
+
+  const getPointCount = (pointId) => {
+    return selectedPoints.filter(item => item.pointId === pointId).length;
+  };
+
+  const getPointIcon = (type) => {
+    switch(type) {
+      case 'trailhead': return '🚩';
+      case 'peak': return '⛰️';
+      case 'hut': return '🏠';
+      default: return '📍';
+    }
+  };
+
+  const getPointTypeLabel = (type) => {
+    switch(type) {
+      case 'trailhead': return '登山口';
+      case 'peak': return '山頭';
+      case 'hut': return '山屋';
+      default: return '經過點';
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    if (selectedPoints.length < 2) {
+      alert('請至少選擇兩個點（起點和終點）');
+      return;
+    }
+
+    // Convert selected points to via_points with full details
+    const via_points = selectedPoints.map(item => {
+      const point = getPointById(item.pointId);
+      return {
+        lat: point.lat,
+        lon: point.lon,
+        name: point.name,
+        type: point.type
+      };
+    });
+
     const params = {
       area_id: formData.area_id,
-      start_lat: parseFloat(formData.start_lat),
-      start_lon: parseFloat(formData.start_lon),
-      loop_route: formData.loop_route,
+      start_lat: via_points[0].lat,
+      start_lon: via_points[0].lon,
+      end_lat: via_points[via_points.length - 1].lat,
+      end_lon: via_points[via_points.length - 1].lon,
+      loop_route: false,
       multi_day: formData.multi_day,
       hiker_fitness: formData.hiker_fitness,
       pack_weight_kg: parseFloat(formData.pack_weight_kg),
       prefer_huts: formData.prefer_huts,
       avoid_difficult: formData.avoid_difficult,
+      via_points: via_points.slice(1, -1) // Exclude first and last (they're start/end)
     };
-
-    // Add selected waypoints as via_points
-    if (selectedRoute && selectedWaypoints.length > 0) {
-      params.via_points = selectedRoute.waypoints
-        .filter(w => selectedWaypoints.includes(w.name))
-        .map(w => ({
-          lat: w.lat,
-          lon: w.lon,
-          name: w.name,
-          type: w.type
-        }));
-    }
 
     if (formData.multi_day) {
       params.target_hours_per_day = parseFloat(formData.target_hours_per_day);
-    }
-
-    if (!formData.loop_route && formData.end_lat && formData.end_lon) {
-      params.end_lat = parseFloat(formData.end_lat);
-      params.end_lon = parseFloat(formData.end_lon);
-    }
-
-    if (formData.max_distance) {
-      params.max_distance = parseFloat(formData.max_distance);
     }
 
     onSubmit(params);
@@ -169,128 +182,109 @@ export default function RouteForm({
           </select>
         </div>
 
-        {/* Route Selection */}
-        {selectedArea && selectedArea.routes && selectedArea.routes.length > 0 && (
+        {/* Quick Route Selection */}
+        {selectedArea && selectedArea.recommended_routes && selectedArea.recommended_routes.length > 0 && (
           <div className="form-group">
-            <label htmlFor="route_id">選擇路線 *</label>
+            <label htmlFor="quick_select">快速選擇推薦路線</label>
             <select
-              id="route_id"
-              name="route_id"
-              value={formData.route_id}
-              onChange={handleChange}
-              required
+              id="quick_select"
+              value={quickSelectRoute}
+              onChange={(e) => setQuickSelectRoute(e.target.value)}
             >
-              <option value="">請選擇路線...</option>
-              {selectedArea.routes.map(route => (
+              <option value="">自訂路線...</option>
+              {selectedArea.recommended_routes.map(route => (
                 <option key={route.route_id} value={route.route_id}>
                   {route.name} ({route.days}天 - {route.difficulty})
                 </option>
               ))}
             </select>
-            {selectedRoute && (
+            {quickSelectRoute && selectedArea.recommended_routes.find(r => r.route_id === quickSelectRoute) && (
               <small style={{ display: 'block', marginTop: '5px', color: '#666' }}>
-                📍 {selectedRoute.description}<br/>
-                📏 距離: {selectedRoute.total_distance} km | ⏱️ {selectedRoute.estimated_time}
+                {selectedArea.recommended_routes.find(r => r.route_id === quickSelectRoute).description}
               </small>
             )}
           </div>
         )}
 
-        {/* Waypoints Selection */}
-        {selectedRoute && selectedRoute.waypoints && selectedRoute.waypoints.length > 0 && (
+        {/* Point Selection */}
+        {selectedArea && (
           <div className="form-group waypoints-group">
-            <label>選擇經過點/山頭/住宿點</label>
-            <div className="waypoints-list">
-              {/* Trailhead (always shown, not selectable) */}
-              <div className="waypoint-item trailhead-item">
-                <span className="waypoint-icon">🚩</span>
-                <div className="waypoint-info">
-                  <strong>{selectedRoute.trailhead.name}</strong>
-                  <small>登山口 | {selectedRoute.trailhead.elevation}m</small>
-                </div>
-                <span className="waypoint-badge required">起點</span>
-              </div>
-              
-              {/* Waypoints */}
-              {selectedRoute.waypoints.map((waypoint, idx) => (
-                <div key={idx} className="waypoint-item">
-                  <input
-                    type="checkbox"
-                    id={`waypoint-${idx}`}
-                    checked={selectedWaypoints.includes(waypoint.name)}
-                    onChange={() => handleWaypointToggle(waypoint.name, waypoint.required)}
-                    disabled={waypoint.required}
-                  />
-                  <label htmlFor={`waypoint-${idx}`} className="waypoint-info">
-                    <span className="waypoint-icon">
-                      {waypoint.type === 'peak' ? '⛰️' : 
-                       waypoint.type === 'hut' ? '🏠' : '📍'}
-                    </span>
-                    <div>
-                      <strong>{waypoint.name}</strong>
-                      <small>
-                        {waypoint.type === 'peak' ? '山頭' : 
-                         waypoint.type === 'hut' ? '山屋' : '中繼點'} | {waypoint.elevation}m
-                        {waypoint.facilities && ` | ${waypoint.facilities.join(', ')}`}
-                      </small>
-                    </div>
-                  </label>
-                  {waypoint.required && (
-                    <span className="waypoint-badge required">必經</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+            <label>選擇路線點位（可拖曳排序）</label>
 
-        {/* Start Point - only show if no route selected */}
-        {!selectedRoute && (
-          <div className="form-group">
-            <label>起點座標 *</label>
-            <div className="coordinate-input">
-              <input
-                type="number"
-                name="start_lat"
-                value={formData.start_lat}
-                onChange={handleChange}
-                placeholder="緯度"
-                step="0.00001"
-                required
-              />
-              <input
-                type="number"
-                name="start_lon"
-                value={formData.start_lon}
-                onChange={handleChange}
-                placeholder="經度"
-                step="0.00001"
-                required
-              />
-            </div>
-          </div>
-        )}
-        {/* End Point - only show if no route selected and not loop */}
-        {!selectedRoute && !formData.loop_route && (
-          <div className="form-group">
-            <label>終點座標</label>
-            <div className="coordinate-input">
-              <input
-                type="number"
-                name="end_lat"
-                value={formData.end_lat}
-                onChange={handleChange}
-                placeholder="緯度"
-                step="0.00001"
-              />
-              <input
-                type="number"
-                name="end_lon"
-                value={formData.end_lon}
-                onChange={handleChange}
-                placeholder="經度"
-                step="0.00001"
-              />
+            {/* Selected Points (in order) */}
+            {selectedPoints.length > 0 && (
+              <div className="selected-points-list">
+                <h4>已選路線（共 {selectedPoints.length} 個點）</h4>
+                {selectedPoints.map((item, index) => {
+                  const point = getPointById(item.pointId);
+                  if (!point) return null;
+                  return (
+                    <div key={item.id} className="selected-point-item">
+                      <span className="point-order">{index + 1}</span>
+                      <span className="waypoint-icon">{getPointIcon(point.type)}</span>
+                      <div className="point-info">
+                        <strong>{point.name}</strong>
+                        <small>{getPointTypeLabel(point.type)} | {point.elevation}m</small>
+                      </div>
+                      <div className="point-actions">
+                        <button
+                          type="button"
+                          onClick={() => handlePointMoveUp(index)}
+                          disabled={index === 0}
+                          className="btn-icon"
+                          title="往上移"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePointMoveDown(index)}
+                          disabled={index === selectedPoints.length - 1}
+                          className="btn-icon"
+                          title="往下移"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePointRemove(item.id)}
+                          className="btn-icon btn-remove"
+                          title="移除"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Available Points */}
+            <div className="available-points">
+              <h4>可選點位（點擊添加到路線）</h4>
+              <div className="points-grid">
+                {selectedArea.points.map((point) => {
+                  const count = getPointCount(point.id);
+                  return (
+                    <div
+                      key={point.id}
+                      className={`point-card ${count > 0 ? 'has-selection' : ''}`}
+                      onClick={() => handlePointAdd(point.id)}
+                      title={`點擊添加「${point.name}」到路線`}
+                    >
+                      <span className="point-icon">{getPointIcon(point.type)}</span>
+                      <div className="point-details">
+                        <strong>{point.name}</strong>
+                        <small>{getPointTypeLabel(point.type)} · {point.elevation}m</small>
+                      </div>
+                      {count > 0 && (
+                        <span className="selection-count">{count}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -355,22 +349,6 @@ export default function RouteForm({
           />
         </div>
 
-        {/* Max Distance */}
-        <div className="form-group">
-          <label htmlFor="max_distance">最大距離 (km)</label>
-          <input
-            type="number"
-            id="max_distance"
-            name="max_distance"
-            value={formData.max_distance}
-            onChange={handleChange}
-            placeholder="選填"
-            min="1"
-            max="100"
-            step="1"
-          />
-        </div>
-
         {/* Preferences */}
         <div className="form-group">
           <label className="checkbox-label">
@@ -401,7 +379,7 @@ export default function RouteForm({
           <button
             type="submit"
             className="btn-primary"
-            disabled={loading}
+            disabled={loading || selectedPoints.length < 2}
           >
             {loading ? '規劃中...' : '🗺️ 規劃路線'}
           </button>
@@ -421,8 +399,9 @@ export default function RouteForm({
         <h3>💡 使用說明</h3>
         <ol>
           <li>選擇登山區域</li>
-          <li>選擇預設路線（或自行在地圖上標記）</li>
-          <li>勾選想要經過的山頭和住宿點</li>
+          <li>快速選擇推薦路線，或點擊卡片自由添加點位</li>
+          <li>點位可重複添加（如往返經過登山口）</li>
+          <li>使用 ▲ ▼ 按鈕調整點位順序</li>
           <li>設定體能水平和背包重量</li>
           <li>點擊「規劃路線」取得詳細路線和GPX</li>
         </ol>

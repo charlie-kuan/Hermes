@@ -11,10 +11,14 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [route, setRoute] = useState(null);
   const [error, setError] = useState(null);
-  
+
   // For route preview
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [selectedWaypoints, setSelectedWaypoints] = useState([]);
+
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('plan'); // 'plan' or 'results'
 
   // Check API health and load areas on mount
   useEffect(() => {
@@ -56,6 +60,8 @@ function App() {
       const result = await apiService.planRoute(params);
       setRoute(result);
       showToast('路線規劃完成！', 'success');
+      // Auto-switch to results tab
+      setActiveTab('results');
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || '路線規劃失敗';
       setError(errorMsg);
@@ -101,35 +107,75 @@ function App() {
 
       {/* Main Content */}
       <div className="main-content">
-        {/* Left Panel - Route Form */}
-        <aside className="left-panel">
-          <RouteForm
-            areas={areas}
-            onSubmit={handlePlanRoute}
-            loading={loading}
-            onClearRoute={handleClearRoute}
-            onRouteSelect={setSelectedRoute}
-            onWaypointsChange={setSelectedWaypoints}
-          />
+        {/* Left Sidebar */}
+        <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+          {/* Sidebar Header with Tabs */}
+          <div className="sidebar-header">
+            <div className="sidebar-tabs">
+              <button
+                className={`tab-button ${activeTab === 'plan' ? 'active' : ''}`}
+                onClick={() => setActiveTab('plan')}
+              >
+                📍 路線規劃
+              </button>
+              <button
+                className={`tab-button ${activeTab === 'results' ? 'active' : ''}`}
+                onClick={() => setActiveTab('results')}
+              >
+                📊 路線資訊
+              </button>
+            </div>
+            <button
+              className="sidebar-toggle"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              title={sidebarOpen ? '收起側邊欄' : '展開側邊欄'}
+            >
+              {sidebarOpen ? '◀' : '▶'}
+            </button>
+          </div>
+
+          {/* Sidebar Content */}
+          <div className="sidebar-content">
+            {activeTab === 'plan' && (
+              <RouteForm
+                areas={areas}
+                onSubmit={handlePlanRoute}
+                loading={loading}
+                onClearRoute={handleClearRoute}
+                onRouteSelect={setSelectedRoute}
+                onWaypointsChange={setSelectedWaypoints}
+              />
+            )}
+
+            {activeTab === 'results' && (
+              <ResultsPanel
+                route={route}
+                onExport={handleExport}
+              />
+            )}
+          </div>
         </aside>
 
-        {/* Center Panel - Map */}
-        <main className="center-panel">
+        {/* Map Section */}
+        <main className="map-section">
           <Map3D
             route={route}
             isLoop={false}
             selectedRoute={selectedRoute}
             selectedWaypoints={selectedWaypoints}
           />
-        </main>
 
-        {/* Right Panel - Results */}
-        <aside className="right-panel">
-          <ResultsPanel
-            route={route}
-            onExport={handleExport}
-          />
-        </aside>
+          {/* Floating Toggle Button (when sidebar is closed) */}
+          {!sidebarOpen && (
+            <button
+              className="floating-toggle"
+              onClick={() => setSidebarOpen(true)}
+              title="展開側邊欄"
+            >
+              ▶
+            </button>
+          )}
+        </main>
       </div>
 
       {/* Loading Overlay */}
