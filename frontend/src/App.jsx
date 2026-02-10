@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import MapComponent from './components/MapComponent';
+import Map3D from './components/Map3D';
 import RouteForm from './components/RouteForm';
 import ResultsPanel from './components/ResultsPanel';
 import { apiService } from './services/api';
@@ -9,8 +9,6 @@ function App() {
   const [areas, setAreas] = useState([]);
   const [apiConnected, setApiConnected] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [startPoint, setStartPoint] = useState(null);
-  const [endPoint, setEndPoint] = useState(null);
   const [route, setRoute] = useState(null);
   const [error, setError] = useState(null);
   
@@ -44,17 +42,8 @@ function App() {
     }
   };
 
-  const handleMapClick = (latlng, isStart) => {
-    if (isStart || !endPoint) {
-      setStartPoint(latlng);
-    } else {
-      setEndPoint(latlng);
-    }
-  };
 
-  const handleClearMarkers = () => {
-    setStartPoint(null);
-    setEndPoint(null);
+  const handleClearRoute = () => {
     setRoute(null);
   };
 
@@ -101,7 +90,7 @@ function App() {
       <header className="header">
         <div className="header-content">
           <h1>🏔️ Project Hermes</h1>
-          <p>智能登山路線規劃系統</p>
+          <p>一站式登山行程規劃系統</p>
         </div>
         <div className="header-status">
           <span className={`status-indicator ${apiConnected ? 'connected' : ''}`}>
@@ -118,9 +107,7 @@ function App() {
             areas={areas}
             onSubmit={handlePlanRoute}
             loading={loading}
-            startPoint={startPoint}
-            endPoint={endPoint}
-            onClearMarkers={handleClearMarkers}
+            onClearRoute={handleClearRoute}
             onRouteSelect={setSelectedRoute}
             onWaypointsChange={setSelectedWaypoints}
           />
@@ -128,11 +115,8 @@ function App() {
 
         {/* Center Panel - Map */}
         <main className="center-panel">
-          <MapComponent
-            startPoint={startPoint}
-            endPoint={endPoint}
+          <Map3D
             route={route}
-            onMapClick={handleMapClick}
             isLoop={false}
             selectedRoute={selectedRoute}
             selectedWaypoints={selectedWaypoints}

@@ -136,12 +136,23 @@ class RoutingService:
         """
         # Define weight function for pathfinding
         def weight_fn(u, v, d):
-            # Handle edge data safely
-            if 'data' not in d:
-                logger.warning(f"Edge {u}->{v} missing 'data' attribute, using default cost")
-                return 10.0  # Default cost for edges without proper data
+            # For MultiDiGraph, d is a dict of {key: edge_data}
+            # We need to extract the actual edge data from the first key
+            if isinstance(d, dict) and len(d) > 0:
+                # Get edge data from first key (handles parallel edges)
+                first_key = next(iter(d))
+                edge_data = d[first_key]
+                
+                # Now check for 'data' attribute
+                if 'data' not in edge_data:
+                    logger.warning(f"Edge {u}->{v} (key={first_key}) missing 'data' attribute, using default cost")
+                    return 10.0
+                
+                edge: Edge = edge_data['data']
+            else:
+                logger.warning(f"Edge {u}->{v} has unexpected format: {type(d)}, using default cost")
+                return 10.0
             
-            edge: Edge = d['data']
             if avoid_difficult:
                 return self.cost_function.adjust_for_avoid_difficult(edge)
             return self.cost_function.calculate_edge_cost(edge)

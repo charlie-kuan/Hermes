@@ -32,9 +32,10 @@ def main():
     logger.info(f"\n1. Loading graph for {area_id}")
     
     try:
-        # Get or build graph
+        # Get or build graph - for example purposes, using explicit bbox
+        # In production, pass area_data for auto-calculation
         bbox = [23.4, 120.8, 23.6, 121.0]  # Example: Yushan area
-        graph = graph_service.get_or_build_graph(area_id, bbox)
+        graph = graph_service.get_or_build_graph(area_id, bbox=bbox)
         
         logger.info(f"   Graph loaded: {graph.number_of_nodes()} nodes, "
                    f"{graph.number_of_edges()} edges")

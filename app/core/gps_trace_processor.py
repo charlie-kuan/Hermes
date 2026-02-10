@@ -263,6 +263,48 @@ class GPSTraceProcessor:
         logger.info(f"Loaded {len(traces)} GPS traces from GeoJSON")
         return traces
     
+    def calculate_traces_bbox(
+        self,
+        gps_traces: List[List[Tuple[float, float]]]
+    ) -> Optional[List[float]]:
+        """
+        Calculate the bounding box that covers all GPS traces.
+        
+        Args:
+            gps_traces: List of GPS traces, each trace is a list of (lat, lon) points
+            
+        Returns:
+            Bounding box [min_lat, min_lon, max_lat, max_lon] or None if no traces
+        """
+        if not gps_traces:
+            return None
+        
+        all_lats = []
+        all_lons = []
+        
+        for trace in gps_traces:
+            for lat, lon in trace:
+                all_lats.append(lat)
+                all_lons.append(lon)
+        
+        if not all_lats:
+            return None
+        
+        min_lat = min(all_lats)
+        max_lat = max(all_lats)
+        min_lon = min(all_lons)
+        max_lon = max(all_lons)
+        
+        # Add small buffer (~500m) to ensure edge nodes are included
+        buffer = 0.005  # ~500 meters
+        
+        return [
+            min_lat - buffer,
+            min_lon - buffer,
+            max_lat + buffer,
+            max_lon + buffer
+        ]
+    
     def enrich_graph_with_trace_popularity(
         self,
         graph: nx.MultiDiGraph,
@@ -315,10 +357,11 @@ class GPSTraceProcessor:
         Build a trail network graph directly from GPS traces.
         
         This is useful when OSM data is insufficient. The function will:
-        1. Simplify traces to reduce noise
-        2. Find intersection points between traces
-        3. Create nodes at intersections and endpoints
-        4. Create edges between nodes based on trace segments
+        1. Calculate actual coverage bbox from GPS traces
+        2. Simplify traces to reduce noise
+        3. Find intersection points between traces
+        4. Create nodes at intersections and endpoints
+        5. Create edges between nodes based on trace segments
         
         Args:
             gps_traces: List of GPS traces, each trace is a list of (lat, lon) points
@@ -333,6 +376,15 @@ class GPSTraceProcessor:
         if not gps_traces:
             logger.warning("No GPS traces provided")
             return nx.MultiDiGraph()
+        
+        # Calculate actual bbox from GPS traces
+        actual_bbox = self.calculate_traces_bbox(gps_traces)
+        if actual_bbox:
+            min_lat, min_lon, max_lat, max_lon = actual_bbox
+            logger.info(
+                f"GPS traces coverage: lat [{min_lat:.5f}, {max_lat:.5f}], "
+                f"lon [{min_lon:.5f}, {max_lon:.5f}]"
+            )
         
         G = nx.MultiDiGraph()
         

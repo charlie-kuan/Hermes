@@ -77,6 +77,7 @@ export default function MapComponent({
 }) {
   const [center] = useState([23.45, 120.95]); // Default center (Taiwan)
   const [isSelectingStart, setIsSelectingStart] = useState(true);
+  const [mapLayer, setMapLayer] = useState('standard'); // 'standard', 'terrain', 'satellite'
 
   // Extract route coordinates for polyline
   const routeCoordinates = route?.segments?.flatMap(segment =>
@@ -104,6 +105,24 @@ export default function MapComponent({
     }
   };
 
+  // Define tile layer configurations
+  const tileLayerConfigs = {
+    standard: {
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    },
+    terrain: {
+      url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+      attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+    },
+    satellite: {
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    }
+  };
+
+  const currentLayer = tileLayerConfigs[mapLayer];
+
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
       <MapContainer
@@ -112,8 +131,10 @@ export default function MapComponent({
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          key={mapLayer}
+          attribution={currentLayer.attribution}
+          url={currentLayer.url}
+          maxZoom={mapLayer === 'terrain' ? 17 : 19}
         />
 
         <MapClickHandler
@@ -239,6 +260,93 @@ export default function MapComponent({
         {!startPoint && '點擊地圖選擇起點 📍'}
         {startPoint && !endPoint && !isLoop && '點擊地圖選擇終點 🏁'}
         {startPoint && isLoop && '環形路線模式 🔄'}
+      </div>
+
+      {/* Layer Switcher */}
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        right: '10px',
+        background: 'white',
+        borderRadius: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        zIndex: 1000,
+        overflow: 'hidden'
+      }}>
+        <button
+          onClick={() => setMapLayer('standard')}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '8px 12px',
+            border: 'none',
+            background: mapLayer === 'standard' ? '#2563eb' : 'white',
+            color: mapLayer === 'standard' ? 'white' : '#1e293b',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: mapLayer === 'standard' ? '600' : '400',
+            textAlign: 'left',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            if (mapLayer !== 'standard') e.target.style.background = '#f8fafc';
+          }}
+          onMouseLeave={(e) => {
+            if (mapLayer !== 'standard') e.target.style.background = 'white';
+          }}
+        >
+          🗺️ 標準地圖
+        </button>
+        <button
+          onClick={() => setMapLayer('terrain')}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '8px 12px',
+            border: 'none',
+            borderTop: '1px solid #e2e8f0',
+            background: mapLayer === 'terrain' ? '#2563eb' : 'white',
+            color: mapLayer === 'terrain' ? 'white' : '#1e293b',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: mapLayer === 'terrain' ? '600' : '400',
+            textAlign: 'left',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            if (mapLayer !== 'terrain') e.target.style.background = '#f8fafc';
+          }}
+          onMouseLeave={(e) => {
+            if (mapLayer !== 'terrain') e.target.style.background = 'white';
+          }}
+        >
+          ⛰️ 地形地圖
+        </button>
+        <button
+          onClick={() => setMapLayer('satellite')}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '8px 12px',
+            border: 'none',
+            borderTop: '1px solid #e2e8f0',
+            background: mapLayer === 'satellite' ? '#2563eb' : 'white',
+            color: mapLayer === 'satellite' ? 'white' : '#1e293b',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: mapLayer === 'satellite' ? '600' : '400',
+            textAlign: 'left',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            if (mapLayer !== 'satellite') e.target.style.background = '#f8fafc';
+          }}
+          onMouseLeave={(e) => {
+            if (mapLayer !== 'satellite') e.target.style.background = 'white';
+          }}
+        >
+          🛰️ 衛星影像
+        </button>
       </div>
     </div>
   );

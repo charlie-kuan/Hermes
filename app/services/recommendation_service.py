@@ -40,21 +40,21 @@ class RecommendationService:
 
         # Essential items (always needed)
         essential_items = [
-            "Backpack (appropriate size)",
-            "Water bottles/hydration system",
-            "First aid kit",
-            "Map and compass/GPS",
-            "Headlamp with extra batteries",
-            "Sun protection (sunscreen, sunglasses, hat)",
-            "Emergency whistle",
-            "Knife or multi-tool"
+            "適合尺寸的背包",
+            "水瓶或水袋系統",
+            "急救包",
+            "地圖與指北針/GPS",
+            "頭燈與備用電池",
+            "防曬用品（防曬乳、太陽眼鏡、帽子）",
+            "緊急哨子",
+            "刀具或多功能工具"
         ]
 
         # Add navigation
         if route.difficulty in [TrailDifficulty.DIFFICULT, TrailDifficulty.EXPERT]:
             essential_items.extend([
-                "GPS device or smartphone with offline maps",
-                "Emergency shelter/bivy"
+                "GPS裝置或具離線地圖的智慧型手機",
+                "緊急庇護所/露宿袋"
             ])
 
         recommendations.append(
@@ -64,13 +64,13 @@ class RecommendationService:
         # Multi-day specific items
         if multi_day_plan and multi_day_plan.total_days > 1:
             overnight_items = [
-                "Sleeping bag (appropriate temperature rating)",
-                "Sleeping pad",
-                "Tent or shelter",
-                "Cooking system (stove, fuel, pot)",
-                "Food storage bag/bear canister",
-                "Toiletries and toilet paper",
-                "Water purification (filter or tablets)"
+                "適合溫度等級的睡袋",
+                "睡墊",
+                "帳篷或遮蔽物",
+                "炊煮系統（爐具、燃料、鍋具）",
+                "食物收納袋/防熊罐",
+                "盥洗用具與衛生紙",
+                "淨水設備（濾水器或淨水錠）"
             ]
 
             # Check if huts are available
@@ -80,9 +80,9 @@ class RecommendationService:
             )
 
             if has_huts:
-                overnight_items.append("Hut sleeping bag liner (huts often provide blankets)")
+                overnight_items.append("山屋睡袋內袋（山屋通常提供毛毯）")
             else:
-                overnight_items.append("Full camping setup required (no huts)")
+                overnight_items.append("需完整露營裝備（無山屋）")
 
             recommendations.append(
                 EquipmentRecommendation(category="overnight", items=overnight_items)
@@ -90,21 +90,21 @@ class RecommendationService:
 
         # Clothing recommendations
         clothing_items = [
-            "Moisture-wicking base layers",
-            "Insulating mid-layer (fleece/down)",
-            "Waterproof rain jacket",
-            "Hiking pants/shorts",
-            "Hiking boots/shoes (broken in)",
-            "Extra socks (wool or synthetic)",
-            "Warm hat and gloves"
+            "排汗快乾底層衣物",
+            "保暖中層（刷毛/羽絨）",
+            "防水雨衣",
+            "登山長褲/短褲",
+            "已磨合的登山鞋/健行鞋",
+            "備用襪子（羊毛或合成纖維）",
+            "保暖帽與手套"
         ]
 
         if season == "winter" or route.waypoints and any(w.elevation > 3000 for w in route.waypoints):
             clothing_items.extend([
-                "Insulated jacket",
-                "Waterproof pants",
-                "Winter hat and gloves",
-                "Gaiters"
+                "保暖外套",
+                "防水長褲",
+                "冬季保暖帽與手套",
+                "綁腿"
             ])
 
         recommendations.append(
@@ -114,11 +114,11 @@ class RecommendationService:
         # Difficulty-based recommendations
         if route.difficulty in [TrailDifficulty.DIFFICULT, TrailDifficulty.EXPERT]:
             technical_items = [
-                "Trekking poles",
-                "Gaiters",
-                "Microspikes or crampons (if icy conditions)",
-                "Helmet (for exposed/rocky terrain)",
-                "Rope and harness (if scrambling/via ferrata)"
+                "登山杖",
+                "綁腿",
+                "簡易冰爪或冰爪（結冰路況）",
+                "安全頭盔（裸岩或碎石地形）",
+                "繩索與吊帶（攀岩路段/鐵線橋）"
             ]
 
             recommendations.append(
@@ -127,12 +127,12 @@ class RecommendationService:
 
         # Optional comfort items
         optional_items = [
-            "Camera",
-            "Trekking poles (if not already listed)",
-            "Insect repellent",
-            "Portable battery pack",
-            "Book or entertainment",
-            "Repair kit (duct tape, cord, patches)"
+            "相機",
+            "登山杖（若尚未列入）",
+            "防蟲液",
+            "行動電源",
+            "書籍或娛樂用品",
+            "修補工具包（膠帶、繩索、補丁）"
         ]
 
         recommendations.append(
@@ -219,16 +219,16 @@ class RecommendationService:
 
         # Generate notes
         notes = [
-            f"Plan for {total_days} day(s) of hiking",
-            f"Estimated {daily_calories} kcal needed per day",
-            "Pack high-calorie, lightweight foods (dried fruits, nuts, energy bars)"
+            f"規劃 {total_days} 天的登山行程",
+            f"每日預估需要 {daily_calories} 大卡熱量",
+            "攜帶高熱量、輕量化食物（果乾、堅果、能量棒）"
         ]
 
         if multi_day_plan and multi_day_plan.total_days > 1:
             notes.extend([
-                "Include freeze-dried meals for dinners",
-                "Pack extra snacks for energy throughout the day",
-                "Consider resupply points if available"
+                "準備冷凍乾燥餐包作為晚餐",
+                "額外攜帶行動糧以補充體力",
+                "考慮沿途補給點（如有）"
             ])
 
             # Check for water sources
@@ -238,9 +238,9 @@ class RecommendationService:
             )
 
             if has_water_sources:
-                notes.append("Water sources available at overnight stops - bring purification method")
+                notes.append("過夜點有水源 - 請攜帶淨水設備")
             else:
-                notes.append("Limited water sources - plan to carry enough water between stops")
+                notes.append("水源有限 - 需規劃攜帶足夠水量")
 
         else:
             notes.append("Carry enough water for the entire hike or know water source locations")

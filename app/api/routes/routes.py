@@ -132,9 +132,11 @@ async def plan_route(
         raise HTTPException(status_code=404, detail=f"Area {request.area_id} not found")
 
     try:
-        # Get or build graph
-        bbox = area_data.get('bbox')
-        graph = graph_service.get_or_build_graph(request.area_id, bbox)
+        # Get or build graph - bbox will be auto-calculated from routes
+        graph = graph_service.get_or_build_graph(
+            request.area_id, 
+            area_data=area_data
+        )
 
         # Find start node
         start_node_id = graph_service.find_nearest_node(

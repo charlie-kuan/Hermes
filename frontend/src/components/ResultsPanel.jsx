@@ -1,4 +1,5 @@
 import { apiService } from '../services/api';
+import ElevationProfile from './ElevationProfile';
 
 export default function ResultsPanel({ route, onExport }) {
   if (!route) {
@@ -71,6 +72,11 @@ export default function ResultsPanel({ route, onExport }) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Elevation Profile */}
+      <div className="result-section">
+        <ElevationProfile route={route} />
       </div>
 
       {/* Time Estimates */}

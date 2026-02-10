@@ -43,11 +43,10 @@ def main():
         logger.info("\n3. 開始重建圖資...")
         for area in areas:
             area_id = area['area_id']
-            bbox = area['bbox']
             
             logger.info(f"\n   處理區域: {area_id}")
             try:
-                graph = graph_service.get_or_build_graph(area_id, bbox)
+                graph = graph_service.get_or_build_graph(area_id, area_data=area)
                 stats = graph_service.get_graph_stats(graph)
                 logger.success(f"   ✓ {area_id}: {stats['total_nodes']} 節點, "
                              f"{stats['total_edges']} 邊, "

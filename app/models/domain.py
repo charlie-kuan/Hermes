@@ -63,7 +63,7 @@ class Edge:
     difficulty: TrailDifficulty
     surface: str = "unpaved"
     trail_name: Optional[str] = None
-    geometry: List[Tuple[float, float]] = field(default_factory=list)  # [(lat, lon), ...]
+    geometry: List[Tuple[float, ...]] = field(default_factory=list)  # [(lat, lon), ...] or [(lat, lon, elevation), ...]
     
     # Popularity indicators
     popularity_score: float = 1.0  # 0.5-2.0, higher = more popular
@@ -85,7 +85,7 @@ class RouteSegment:
     elevation_loss: float  # meters
     estimated_time: float  # hours
     difficulty: TrailDifficulty
-    geometry: List[Tuple[float, float]] = field(default_factory=list)
+    geometry: List[Tuple[float, ...]] = field(default_factory=list)  # [(lat, lon), ...] or [(lat, lon, elevation), ...]
 
 
 @dataclass

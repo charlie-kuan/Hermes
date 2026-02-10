@@ -4,9 +4,7 @@ export default function RouteForm({
   areas,
   onSubmit,
   loading,
-  startPoint,
-  endPoint,
-  onClearMarkers,
+  onClearRoute,
   onRouteSelect,
   onWaypointsChange
 }) {
@@ -30,27 +28,6 @@ export default function RouteForm({
   const [selectedArea, setSelectedArea] = useState(null);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [selectedWaypoints, setSelectedWaypoints] = useState([]);
-
-  // Update form when markers are placed
-  useEffect(() => {
-    if (startPoint) {
-      setFormData(prev => ({
-        ...prev,
-        start_lat: startPoint.lat.toFixed(5),
-        start_lon: startPoint.lng.toFixed(5),
-      }));
-    }
-  }, [startPoint]);
-
-  useEffect(() => {
-    if (endPoint) {
-      setFormData(prev => ({
-        ...prev,
-        end_lat: endPoint.lat.toFixed(5),
-        end_lon: endPoint.lng.toFixed(5),
-      }));
-    }
-  }, [endPoint]);
 
   // Handle area selection
   useEffect(() => {
@@ -291,7 +268,6 @@ export default function RouteForm({
                 required
               />
             </div>
-            <small>點擊地圖選擇起點</small>
           </div>
         )}
         {/* End Point - only show if no route selected and not loop */}
@@ -316,7 +292,6 @@ export default function RouteForm({
                 step="0.00001"
               />
             </div>
-            <small>點擊地圖選擇終點</small>
           </div>
         )}
 
@@ -434,9 +409,9 @@ export default function RouteForm({
           <button
             type="button"
             className="btn-secondary"
-            onClick={onClearMarkers}
+            onClick={onClearRoute}
           >
-            🗑️ 清除標記
+            🗑️ 清除路線
           </button>
         </div>
       </form>

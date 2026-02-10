@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     osm_cache_dir: Path = Field(default=Path("./data/osm"), alias="OSM_CACHE_DIR")
     elevation_cache_dir: Path = Field(default=Path("./data/elevation"), alias="ELEVATION_CACHE_DIR")
     graph_cache_dir: Path = Field(default=Path("./data/graphs"), alias="GRAPH_CACHE_DIR")
+    
+    # Local DEM Configuration (台湾内政部 DEM 数据)
+    local_dem_dir: Path = Field(default=Path("./data/elevation/dem"), alias="LOCAL_DEM_DIR")
+    use_local_dem: bool = Field(default=True, alias="USE_LOCAL_DEM")
 
     # Routing Configuration
     default_fitness_level: str = Field(default="moderate", alias="DEFAULT_FITNESS_LEVEL")
@@ -41,6 +45,8 @@ class Settings(BaseSettings):
 
     # OSM Configuration
     osm_user_agent: str = Field(default="project_hermes_hiking_planner", alias="OSM_USER_AGENT")
+    osm_download_pois: bool = Field(default=False, alias="OSM_DOWNLOAD_POIS")  # Disable by default (slow, low Taiwan coverage)
+    osm_poi_tags: List[str] = Field(default=["natural=peak"], alias="OSM_POI_TAGS")  # Only useful tags for Taiwan
 
     # CORS
     cors_origins: List[str] = Field(
@@ -58,6 +64,7 @@ class Settings(BaseSettings):
         self.osm_cache_dir.mkdir(parents=True, exist_ok=True)
         self.elevation_cache_dir.mkdir(parents=True, exist_ok=True)
         self.graph_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.local_dem_dir.mkdir(parents=True, exist_ok=True)
 
 
 # Global settings instance

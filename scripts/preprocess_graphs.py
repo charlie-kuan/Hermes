@@ -49,13 +49,11 @@ def preprocess_area(area_id: str):
         logger.error(f"Area {area_id} not found in areas.json")
         return False
 
-    bbox = area_data['bbox']
-
-    # Build graph
+    # Build graph - bbox auto-calculated from routes
     graph_service = GraphService()
 
     try:
-        graph = graph_service.get_or_build_graph(area_id, bbox)
+        graph = graph_service.get_or_build_graph(area_id, area_data=area_data)
 
         # Get stats
         stats = graph_service.get_graph_stats(graph)

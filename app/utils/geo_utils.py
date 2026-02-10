@@ -152,3 +152,61 @@ def calculate_bbox_area(bbox: List[float]) -> float:
     height = haversine_distance(min_lat, min_lon, max_lat, min_lon) / 1000
 
     return width * height
+
+
+def calculate_bbox_from_area_data(area_data: dict, buffer_km: float = 2.0) -> List[float]:
+    """
+    Calculate bounding box from area's routes (trailheads, waypoints, peaks).
+    
+    This eliminates the need for manually maintaining bbox in areas.json.
+    The bbox is automatically calculated from actual route coordinates.
+    
+    Args:
+        area_data: Area dictionary containing routes with trailheads and waypoints
+        buffer_km: Buffer distance in kilometers to add around points (default 2km)
+        
+    Returns:
+        Bounding box [min_lat, min_lon, max_lat, max_lon]
+        
+    Raises:
+        ValueError: If no valid coordinates found in area data
+    """
+    lats = []
+    lons = []
+    
+    # Extract coordinates from routes
+    routes = area_data.get('routes', [])
+    for route in routes:
+        # Trailhead
+        trailhead = route.get('trailhead', {})
+        if 'lat' in trailhead and 'lon' in trailhead:
+            lats.append(trailhead['lat'])
+            lons.append(trailhead['lon'])
+        
+        # Waypoints (peaks, huts, viewpoints, etc.)
+        waypoints = route.get('waypoints', [])
+        for waypoint in waypoints:
+            if 'lat' in waypoint and 'lon' in waypoint:
+                lats.append(waypoint['lat'])
+                lons.append(waypoint['lon'])
+    
+    if not lats or not lons:
+        raise ValueError(f"No valid coordinates found in area {area_data.get('area_id', 'unknown')}")
+    
+    # Calculate bbox with buffer
+    min_lat = min(lats)
+    max_lat = max(lats)
+    min_lon = min(lons)
+    max_lon = max(lons)
+    
+    # Convert buffer from km to approximate degrees
+    # At mid-latitudes: 1 degree latitude ≈ 111 km
+    # Longitude varies with latitude, but we use a conservative estimate
+    buffer_deg = buffer_km / 111.0
+    
+    return [
+        min_lat - buffer_deg,
+        min_lon - buffer_deg,
+        max_lat + buffer_deg,
+        max_lon + buffer_deg
+    ]

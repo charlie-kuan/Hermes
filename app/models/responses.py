@@ -61,6 +61,7 @@ class RouteSegmentResponse(BaseModel):
     estimated_time: float = Field(..., description="Estimated time in hours")
     difficulty: str
     trail_name: Optional[str] = None
+    geometry: List[List[float]] = Field(default_factory=list, description="Path geometry as [[lat, lon], ...]")
 
 
 class TimeEstimate(BaseModel):
@@ -129,7 +130,7 @@ class AreaResponse(BaseModel):
     name: str
     description: str
     country: str
-    bbox: List[float] = Field(..., description="Bounding box [min_lat, min_lon, max_lat, max_lon]")
+    bbox: Optional[List[float]] = Field(None, description="Bounding box [min_lat, min_lon, max_lat, max_lon] (legacy, auto-calculated from routes)")
     elevation_range: List[int] = Field(..., description="[min_elevation, max_elevation] in meters")
     trail_count: Optional[int] = None
     peak_count: Optional[int] = None

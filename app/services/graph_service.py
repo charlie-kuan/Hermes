@@ -23,19 +23,29 @@ class GraphService:
         self.gps_trace_processor = GPSTraceProcessor()
         self.loaded_graphs = {}  # In-memory cache
 
-    def get_or_build_graph(self, area_id: str, bbox: Optional[List[float]] = None) -> nx.MultiDiGraph:
+    def get_or_build_graph(
+        self, 
+        area_id: str, 
+        bbox: Optional[List[float]] = None,
+        area_data: Optional[dict] = None
+    ) -> nx.MultiDiGraph:
         """
         Get graph for an area, building it if necessary.
+        
+        The bbox can be provided explicitly, calculated from area_data routes,
+        or loaded from cached area_data bbox (legacy). This eliminates the need
+        to manually maintain bbox values.
 
         Args:
             area_id: Area identifier
-            bbox: Optional bounding box [min_lat, min_lon, max_lat, max_lon]
+            bbox: Optional explicit bounding box [min_lat, min_lon, max_lat, max_lon]
+            area_data: Optional area dictionary with routes to auto-calculate bbox
 
         Returns:
             NetworkX MultiDiGraph
 
         Raises:
-            GraphNotFoundError: If graph not found and bbox not provided
+            GraphNotFoundError: If graph not found and bbox cannot be determined
         """
         # Check in-memory cache
         if area_id in self.loaded_graphs:
@@ -48,9 +58,27 @@ class GraphService:
             self.loaded_graphs[area_id] = cached_graph
             return cached_graph
 
-        # Build new graph
+        # Build new graph - determine bbox
         if bbox is None:
-            raise GraphNotFoundError(f"No cached graph for {area_id} and no bbox provided to build one")
+            if area_data is not None:
+                # Auto-calculate bbox from routes
+                from app.utils.geo_utils import calculate_bbox_from_area_data
+                try:
+                    bbox = calculate_bbox_from_area_data(area_data)
+                    logger.info(
+                        f"Auto-calculated bbox for {area_id} from routes: "
+                        f"[{bbox[0]:.4f}, {bbox[1]:.4f}, {bbox[2]:.4f}, {bbox[3]:.4f}]"
+                    )
+                except ValueError as e:
+                    logger.warning(f"Could not calculate bbox from routes: {e}")
+                    # Fallback to legacy bbox from area_data if exists
+                    bbox = area_data.get('bbox')
+            
+            if bbox is None:
+                raise GraphNotFoundError(
+                    f"No cached graph for {area_id} and no bbox provided. "
+                    f"Either provide bbox explicitly, area_data with routes, or cached area_data with bbox."
+                )
 
         logger.info(f"Building new graph for area: {area_id}")
         graph = self.osm_processor.download_trail_network(bbox, area_id)
@@ -84,6 +112,8 @@ class GraphService:
 
         min_dist = float('inf')
         nearest = None
+        nearest_lat = None
+        nearest_lon = None
 
         for node_id, data in graph.nodes(data=True):
             node: Node = data['data']
@@ -92,11 +122,16 @@ class GraphService:
             if dist < min_dist:
                 min_dist = dist
                 nearest = node_id
+                nearest_lat = node.lat
+                nearest_lon = node.lon
 
         if min_dist > max_distance:
             logger.warning(
-                f"Nearest node is {min_dist:.0f}m away at ({lat:.5f}, {lon:.5f}), "
-                f"exceeds max distance of {max_distance:.0f}m"
+                f"Nearest node is {min_dist:.0f}m away at ({nearest_lat:.5f}, {nearest_lon:.5f}), "
+                f"exceeds max distance of {max_distance:.0f}m. "
+                f"Query coordinates: ({lat:.5f}, {lon:.5f}). "
+                f"Possible causes: (1) coordinates outside trail network coverage, "
+                f"(2) insufficient GPS trace data, or (3) area bbox needs expansion."
             )
             return None
 
@@ -261,7 +296,8 @@ class GraphService:
         Build a trail network graph directly from GPS traces.
         
         This is useful when OSM data is insufficient or unavailable.
-        The graph will be built entirely from GPS trace data.
+        The graph will be built entirely from GPS trace data, and the actual
+        coverage bbox will be automatically calculated from the traces.
         
         Args:
             area_id: Area identifier
@@ -271,6 +307,10 @@ class GraphService:
             
         Returns:
             NetworkX MultiDiGraph built from GPS traces
+            
+        Note:
+            The function automatically calculates the bounding box from GPS traces
+            with a ~500m buffer, so it's not limited by predefined area bbox values.
         """
         if gps_trace_dir is None:
             gps_trace_dir = Path(settings.data_dir) / "gps_traces" / area_id

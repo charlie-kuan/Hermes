@@ -33,7 +33,8 @@ class TimeEstimator:
         elevation_loss_m: float,
         difficulty: TrailDifficulty,
         fitness: FitnessLevel,
-        pack_weight_kg: float = 12.0
+        pack_weight_kg: float = 12.0,
+        apply_minimum: bool = True
     ) -> float:
         """
         Estimate hiking time using enhanced Naismith's Rule.
@@ -48,6 +49,7 @@ class TimeEstimator:
             difficulty: Trail difficulty
             fitness: Hiker fitness level
             pack_weight_kg: Pack weight in kg
+            apply_minimum: Whether to apply 30-minute minimum (for complete routes only)
 
         Returns:
             Estimated time in hours
@@ -81,7 +83,11 @@ class TimeEstimator:
         if total_time > 4.0:
             total_time *= 1.1
 
-        return max(0.5, total_time)  # Minimum 30 minutes
+        # Apply minimum only for complete routes, not individual segments
+        if apply_minimum:
+            return max(0.5, total_time)  # Minimum 30 minutes for complete routes
+        else:
+            return max(0.01, total_time)  # Minimum 36 seconds for segments
 
     def estimate_with_scenarios(
         self,
@@ -144,9 +150,11 @@ class TimeEstimator:
         Returns:
             Estimated time in hours
         """
+        # Don't apply 30-minute minimum to segments (only to complete routes)
         time = self.estimate_time(
             distance_km, elevation_gain_m, elevation_loss_m,
-            difficulty, fitness, pack_weight_kg
+            difficulty, fitness, pack_weight_kg,
+            apply_minimum=False  # Don't force 30-minute minimum on segments
         )
 
         # Don't apply rest break multiplier to individual segments

@@ -19,6 +19,8 @@ class OSMProcessor:
         self.elevation_processor = ElevationProcessor()
         ox.settings.user_agent = settings.osm_user_agent
         ox.settings.use_cache = True
+        ox.settings.timeout = 30  # 30 seconds timeout for OSM queries
+        ox.settings.cache_folder = str(settings.osm_cache_dir)
 
     def download_trail_network(
         self,
@@ -45,9 +47,13 @@ class OSMProcessor:
             trails = self._download_trails(bbox)
             logger.info(f"Downloaded {len(trails)} trail ways")
 
-            # Download POIs (peaks, huts, etc.)
-            pois = self._download_pois(bbox)
-            logger.info(f"Downloaded {len(pois)} POIs")
+            # Download POIs (peaks, huts, etc.) - optional, disabled by default
+            pois = []
+            if settings.osm_download_pois:
+                pois = self._download_pois(bbox)
+                logger.info(f"Downloaded {len(pois)} POIs")
+            else:
+                logger.debug(f"POI download disabled (osm_download_pois=False)")
 
             # Build graph from trails
             self._build_graph_from_trails(G, trails)
@@ -102,48 +108,63 @@ class OSMProcessor:
             return {'nodes': None, 'edges': None, 'graph': nx.MultiDiGraph()}
 
     def _download_pois(self, bbox: List[float]) -> List[dict]:
-        """Download points of interest from OSM."""
+        """Download points of interest from OSM based on configured tags.
+        
+        Note: Many POI types have low coverage in Taiwan OSM data.
+        Configure osm_poi_tags in settings to only query useful tags.
+        """
         min_lat, min_lon, max_lat, max_lon = bbox
         pois = []
 
-        # POI tags to download
-        poi_tags = {
-            'natural': ['peak', 'saddle'],
-            'tourism': ['alpine_hut', 'wilderness_hut', 'camp_site', 'viewpoint'],
-            'amenity': ['shelter', 'drinking_water'],
-            'highway': ['trailhead']
-        }
+        # Parse POI tags from config (format: "key=value")
+        poi_queries = {}
+        for tag_str in settings.osm_poi_tags:
+            try:
+                key, value = tag_str.split('=', 1)
+                if key not in poi_queries:
+                    poi_queries[key] = []
+                poi_queries[key].append(value)
+            except ValueError:
+                logger.warning(f"Invalid POI tag format: {tag_str} (expected 'key=value')")
 
-        for key, values in poi_tags.items():
-            for value in values:
-                try:
-                    features = ox.features_from_bbox(
-                        north=max_lat,
-                        south=min_lat,
-                        east=max_lon,
-                        west=min_lon,
-                        tags={key: value}
-                    )
+        if not poi_queries:
+            logger.debug("No POI tags configured, skipping POI download")
+            return pois
 
-                    for idx, feature in features.iterrows():
-                        # Handle both Point and other geometries
-                        if hasattr(feature.geometry, 'centroid'):
-                            centroid = feature.geometry.centroid
-                            lat, lon = centroid.y, centroid.x
-                        else:
-                            continue
+        # Download POIs by batching values per key
+        for key, values in poi_queries.items():
+            try:
+                # Use regex to match any of the values in one query
+                value_regex = '|'.join(values) if len(values) > 1 else values[0]
+                features = ox.features_from_bbox(
+                    bbox=(max_lat, min_lat, max_lon, min_lon),
+                    tags={key: value_regex}
+                )
 
-                        poi = {
-                            'lat': lat,
-                            'lon': lon,
-                            'type': value,
-                            'name': feature.get('name', None),
-                            'elevation': feature.get('ele', None)
-                        }
-                        pois.append(poi)
+                for idx, feature in features.iterrows():
+                    # Handle both Point and other geometries
+                    if hasattr(feature.geometry, 'centroid'):
+                        centroid = feature.geometry.centroid
+                        lat, lon = centroid.y, centroid.x
+                    else:
+                        continue
 
-                except Exception as e:
-                    logger.debug(f"No {key}={value} found: {e}")
+                    # Determine the specific type from the feature tags
+                    feature_type = feature.get(key, values[0])
+                    
+                    poi = {
+                        'lat': lat,
+                        'lon': lon,
+                        'type': feature_type,
+                        'name': feature.get('name', None),
+                        'elevation': feature.get('ele', None)
+                    }
+                    pois.append(poi)
+
+                logger.debug(f"Found {len([p for p in pois if p.get('type') in values])} {key} POIs")
+
+            except Exception as e:
+                logger.debug(f"No {key} features found: {e}")
 
         return pois
 
@@ -173,7 +194,22 @@ class OSMProcessor:
         for u, v, key, data in osm_graph.edges(keys=True, data=True):
             # Get edge attributes
             osm_popularity = self._calculate_popularity_score(data)
-            
+
+            # Extract geometry from edges_gdf if available
+            geometry = []
+            try:
+                # Find the corresponding edge in the GeoDataFrame
+                edge_row = edges_gdf[(edges_gdf['u'] == u) & (edges_gdf['v'] == v) & (edges_gdf['key'] == key)]
+                if not edge_row.empty and hasattr(edge_row.iloc[0], 'geometry'):
+                    geom = edge_row.iloc[0].geometry
+                    if geom is not None and hasattr(geom, 'coords'):
+                        # Extract coordinates from LineString
+                        # OSM geometry is (lon, lat), we need (lat, lon)
+                        geometry = [(lat, lon) for lon, lat in geom.coords]
+                        logger.debug(f"Extracted {len(geometry)} points from edge {u}->{v}")
+            except Exception as e:
+                logger.debug(f"Could not extract geometry for edge {u}->{v}: {e}")
+
             edge_data = Edge(
                 source=str(u),
                 target=str(v),
@@ -183,7 +219,7 @@ class OSMProcessor:
                 difficulty=self._map_difficulty(data),
                 surface=data.get('surface', 'unpaved'),
                 trail_name=data.get('name', None),
-                geometry=[],
+                geometry=geometry,
                 # Popularity indicators
                 popularity_score=osm_popularity,
                 gps_trace_count=0,
@@ -262,74 +298,55 @@ class OSMProcessor:
                     G.add_edge(node.id, nearest_node, key=0, data=edge_reverse)
 
     def _enrich_elevations(self, G: nx.MultiDiGraph) -> None:
-        """Enrich nodes with elevation data from SRTM."""
-        logger.info("Enriching elevation data...")
-        
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-        import time
-        
-        def fetch_elevation_safe(node):
-            """Safely fetch elevation with error handling."""
-            try:
-                elevation = self.elevation_processor.get_elevation(node.lat, node.lon)
-                return elevation
-            except Exception as e:
-                logger.debug(f"Failed to get elevation: {e}")
-                return None
-        
+        """Enrich nodes with elevation data from local DEM or SRTM."""
+        logger.info(f"Enriching elevation data for {G.number_of_nodes()} nodes using local DEM...")
+
         nodes_processed = 0
         nodes_with_elevation = 0
-        max_nodes_to_process = 50  # Limit to avoid long delays
-        timeout_per_node = 3  # 3 seconds per node
-        
-        # Use thread pool for parallel processing with timeout
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            for node_id, data in G.nodes(data=True):
-                node: Node = data['data']
+        nodes_failed = 0
 
-                # Skip if already has elevation
-                if node.elevation and node.elevation > 0:
-                    nodes_with_elevation += 1
-                    continue
-
-                # Skip after processing limit
-                if nodes_processed >= max_nodes_to_process:
-                    # Use default elevation for remaining nodes
-                    if node.elevation <= 0:
-                        node.elevation = 2500.0
-                    continue
-
-                # Fetch from SRTM with timeout
-                try:
-                    future = executor.submit(fetch_elevation_safe, node)
-                    elevation = future.result(timeout=timeout_per_node)
-                    
-                    if elevation is not None and elevation > 0:
-                        node.elevation = elevation
-                        nodes_with_elevation += 1
-                    else:
-                        # Use default for invalid data
-                        node.elevation = 2500.0
-                        
-                except FutureTimeoutError:
-                    logger.warning(f"Elevation fetch timeout for node {node_id}")
-                    node.elevation = 2500.0
-                except Exception as e:
-                    logger.debug(f"Error fetching elevation for node {node_id}: {e}")
-                    node.elevation = 2500.0
-                
-                nodes_processed += 1
-        
-        # Set default elevation for any remaining nodes without elevation
+        # Process all nodes (local DEM is fast, no need for limits)
         for node_id, data in G.nodes(data=True):
             node: Node = data['data']
-            if node.elevation <= 0:
-                node.elevation = 2500.0
-        
-        logger.info(f"Enriched elevation data: {nodes_with_elevation}/{G.number_of_nodes()} nodes (processed {nodes_processed}, rest use default)")
+
+            # Skip if already has valid elevation
+            if node.elevation and node.elevation > 0:
+                nodes_with_elevation += 1
+                continue
+
+            # Get elevation from local DEM or SRTM
+            try:
+                elevation = self.elevation_processor.get_elevation(node.lat, node.lon)
+
+                if elevation is not None and elevation > 0:
+                    node.elevation = elevation
+                    nodes_with_elevation += 1
+                else:
+                    # Use reasonable default based on Taiwan mountain ranges
+                    node.elevation = 2000.0
+                    nodes_failed += 1
+                    logger.debug(f"No elevation data for node {node_id} at ({node.lat:.4f}, {node.lon:.4f}), using default")
+
+            except Exception as e:
+                logger.debug(f"Error fetching elevation for node {node_id}: {e}")
+                node.elevation = 2000.0
+                nodes_failed += 1
+
+            nodes_processed += 1
+
+            # Progress logging for large graphs
+            if nodes_processed % 100 == 0:
+                logger.info(f"Processed {nodes_processed}/{G.number_of_nodes()} nodes")
+
+        logger.info(f"Enriched elevation data: {nodes_with_elevation}/{G.number_of_nodes()} nodes successfully, {nodes_failed} nodes using default")
 
     def _calculate_edge_metrics(self, G: nx.MultiDiGraph) -> None:
-        """Calculate elevation gain/loss for edges."""
+        """Calculate elevation gain/loss for edges using detailed geometry."""
+        logger.info("Calculating edge metrics with DEM elevation data...")
+
+        edges_processed = 0
+        edges_with_geometry = 0
+
         for u, v, key, data in G.edges(keys=True, data=True):
             edge: Edge = data['data']
 
@@ -337,14 +354,72 @@ class OSMProcessor:
             source_node: Node = G.nodes[u]['data']
             target_node: Node = G.nodes[v]['data']
 
-            elev_diff = target_node.elevation - source_node.elevation
+            # If edge has detailed geometry, use it for more accurate elevation profile
+            if edge.geometry and len(edge.geometry) > 2:
+                try:
+                    # Get elevations for all points in the geometry
+                    elevations = []
+                    geometry_with_elevation = []
 
-            if elev_diff > 0:
-                edge.elevation_gain = elev_diff
-                edge.elevation_loss = 0.0
+                    for lat, lon in edge.geometry:
+                        elev = self.elevation_processor.get_elevation(lat, lon)
+                        if elev is not None:
+                            elevations.append(elev)
+                        else:
+                            # Fallback to interpolation if elevation not available
+                            elevations.append(None)
+
+                    # Interpolate missing elevations
+                    if elevations and any(e is not None for e in elevations):
+                        elevations = self.elevation_processor.interpolate_missing_elevations(elevations)
+
+                        # Update geometry to include elevation data (lat, lon, elevation)
+                        for (lat, lon), elev in zip(edge.geometry, elevations):
+                            geometry_with_elevation.append((lat, lon, elev))
+
+                        edge.geometry = geometry_with_elevation
+
+                        # Calculate gain/loss from elevation profile
+                        gain, loss = self.elevation_processor.calculate_elevation_gain_loss(elevations)
+                        edge.elevation_gain = gain
+                        edge.elevation_loss = loss
+
+                        # Update node elevations with geometry endpoints if more accurate
+                        if elevations[0] > 0:
+                            source_node.elevation = elevations[0]
+                        if elevations[-1] > 0:
+                            target_node.elevation = elevations[-1]
+
+                        edges_with_geometry += 1
+                        logger.debug(f"Edge {u}->{v}: {len(elevations)} elevation points, gain={gain:.1f}m, loss={loss:.1f}m")
+                    else:
+                        # Fallback to simple calculation
+                        self._calculate_simple_elevation_diff(edge, source_node, target_node)
+
+                except Exception as e:
+                    logger.debug(f"Error processing geometry for edge {u}->{v}: {e}")
+                    # Fallback to simple calculation
+                    self._calculate_simple_elevation_diff(edge, source_node, target_node)
             else:
-                edge.elevation_gain = 0.0
-                edge.elevation_loss = abs(elev_diff)
+                # No detailed geometry, use simple start/end calculation
+                self._calculate_simple_elevation_diff(edge, source_node, target_node)
+
+            edges_processed += 1
+            if edges_processed % 100 == 0:
+                logger.debug(f"Processed {edges_processed}/{G.number_of_edges()} edges")
+
+        logger.info(f"Calculated metrics for {edges_processed} edges ({edges_with_geometry} with detailed elevation profiles)")
+
+    def _calculate_simple_elevation_diff(self, edge: Edge, source_node: Node, target_node: Node) -> None:
+        """Calculate simple elevation gain/loss from start and end points."""
+        elev_diff = target_node.elevation - source_node.elevation
+
+        if elev_diff > 0:
+            edge.elevation_gain = elev_diff
+            edge.elevation_loss = 0.0
+        else:
+            edge.elevation_gain = 0.0
+            edge.elevation_loss = abs(elev_diff)
 
     def _calculate_popularity_score(self, edge_data: dict) -> float:
         """

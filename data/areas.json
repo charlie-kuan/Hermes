@@ -5,7 +5,6 @@
       "name": "玉山群峰",
       "description": "台灣第一高峰玉山主峰（3952m），包含玉山前峰、東峰、北峰、西峰等群峰，及八通關古道",
       "country": "台灣",
-      "bbox": [23.45, 120.85, 23.50, 120.98],
       "elevation_range": [2400, 3952],
       "trail_count": 15,
       "peak_count": 8,
@@ -50,6 +49,125 @@
           ],
           "estimated_time": "10-12小時",
           "highlight": "台灣第一高峰，日出景觀絕美"
+        },
+        {
+          "route_id": "yushan_front_peak",
+          "name": "玉山前峰單日",
+          "description": "從塔塔加登山口直攻玉山前峰，適合單日往返的高山健行",
+          "days": 1,
+          "difficulty": "中等",
+          "total_distance": 12.0,
+          "trailhead": {
+            "name": "塔塔加登山口",
+            "lat": 23.4690,
+            "lon": 120.9070,
+            "elevation": 2610,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "玉山前峰",
+              "lat": 23.4680,
+              "lon": 120.9420,
+              "elevation": 3239,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "6-7小時",
+          "highlight": "絕佳展望，可遠眺玉山主峰"
+        },
+        {
+          "route_id": "yushan_east_peak",
+          "name": "玉山東峰三日",
+          "description": "從排雲山莊出發，經玉山主峰、東峰，深度探索玉山群峰",
+          "days": 3,
+          "difficulty": "困難",
+          "total_distance": 28.5,
+          "trailhead": {
+            "name": "塔塔加登山口",
+            "lat": 23.4690,
+            "lon": 120.9070,
+            "elevation": 2610,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "排雲山莊",
+              "lat": 23.4720,
+              "lon": 120.9130,
+              "elevation": 3402,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "玉山主峰",
+              "lat": 23.4700,
+              "lon": 120.9570,
+              "elevation": 3952,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "玉山東峰",
+              "lat": 23.4680,
+              "lon": 120.9620,
+              "elevation": 3869,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "15-18小時",
+          "highlight": "台灣第三高峰，雲海、日出雙重享受"
+        },
+        {
+          "route_id": "yushan_north_peak",
+          "name": "玉山北峰四日",
+          "description": "從排雲山莊出發，經主峰、圓峰、北峰的進階路線",
+          "days": 4,
+          "difficulty": "非常困難",
+          "total_distance": 35.0,
+          "trailhead": {
+            "name": "塔塔加登山口",
+            "lat": 23.478097, 
+            "lon": 120.891017,
+            "elevation": 2610,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "排雲山莊",
+              "lat": 23.4720,
+              "lon": 120.9130,
+              "elevation": 3402,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "圓峰山屋",
+              "lat": 23.4750,
+              "lon": 120.9650,
+              "elevation": 3650,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "用水"]
+            },
+            {
+              "name": "玉山北峰",
+              "lat": 23.4820,
+              "lon": 120.9680,
+              "elevation": 3858,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "20-24小時",
+          "highlight": "玉山群峰深度之旅，挑戰者路線"
         }
       ]
     },
@@ -58,7 +176,6 @@
       "name": "合歡山群峰",
       "description": "台灣最容易親近的高山區域，包含合歡主峰、東峰、北峰、西峰、石門山等，有台14甲線公路通達",
       "country": "台灣",
-      "bbox": [24.10, 121.25, 24.20, 121.32],
       "elevation_range": [3100, 3422],
       "trail_count": 10,
       "peak_count": 6,
@@ -130,6 +247,122 @@
           ],
           "estimated_time": "5-6小時",
           "highlight": "一次攻下兩座百岳，展望極佳"
+        },
+        {
+          "route_id": "hehuan_north",
+          "name": "合歡北峰",
+          "description": "從小風口出發攀登合歡北峰，展望絕佳的單日路線",
+          "days": 1,
+          "difficulty": "中等",
+          "total_distance": 4.4,
+          "trailhead": {
+            "name": "小風口",
+            "lat": 24.1380,
+            "lon": 121.2820,
+            "elevation": 3150,
+            "type": "trailhead",
+            "facilities": ["停車場"]
+          },
+          "waypoints": [
+            {
+              "name": "合歡北峰",
+              "lat": 24.1520,
+              "lon": 121.2850,
+              "elevation": 3422,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "4-5小時",
+          "highlight": "合歡群峰最高峰，360度無死角展望"
+        },
+        {
+          "route_id": "hehuan_west",
+          "name": "合歡西峰",
+          "description": "從松雪樓出發攀登合歡西峰，挑戰合歡山區最難的百岳",
+          "days": 1,
+          "difficulty": "困難",
+          "total_distance": 12.0,
+          "trailhead": {
+            "name": "松雪樓",
+            "lat": 24.1370,
+            "lon": 121.2720,
+            "elevation": 3150,
+            "type": "trailhead",
+            "facilities": ["住宿", "停車場", "餐廳"]
+          },
+          "waypoints": [
+            {
+              "name": "合歡西峰",
+              "lat": 24.1280,
+              "lon": 121.2620,
+              "elevation": 3145,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "7-9小時",
+          "highlight": "合歡山區最具挑戰性的百岳，箭竹草坡美景"
+        },
+        {
+          "route_id": "hehuan_grand_tour",
+          "name": "合歡群峰大縱走",
+          "description": "一次走完合歡山所有主要山峰，挑戰者的夢想路線",
+          "days": 2,
+          "difficulty": "非常困難",
+          "total_distance": 25.0,
+          "trailhead": {
+            "name": "小風口",
+            "lat": 24.1380,
+            "lon": 121.2820,
+            "elevation": 3150,
+            "type": "trailhead",
+            "facilities": ["停車場"]
+          },
+          "waypoints": [
+            {
+              "name": "合歡北峰",
+              "lat": 24.1520,
+              "lon": 121.2850,
+              "elevation": 3422,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "合歡西峰",
+              "lat": 24.1280,
+              "lon": 121.2620,
+              "elevation": 3145,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "合歡主峰",
+              "lat": 24.1420,
+              "lon": 121.2720,
+              "elevation": 3417,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "合歡東峰",
+              "lat": 24.1460,
+              "lon": 121.2810,
+              "elevation": 3421,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "石門山",
+              "lat": 24.1450,
+              "lon": 121.2920,
+              "elevation": 3237,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "14-16小時",
+          "highlight": "合歡山區終極挑戰，五座百岳一次滿足"
         }
       ]
     },
@@ -138,7 +371,6 @@
       "name": "雪山主峰、東峰",
       "description": "台灣第二高峰（3886m），雪山山脈主峰，有著名的黑森林及雪山圈谷",
       "country": "台灣",
-      "bbox": [24.35, 121.20, 24.42, 121.28],
       "elevation_range": [2100, 3886],
       "trail_count": 8,
       "peak_count": 4,
@@ -191,6 +423,471 @@
           ],
           "estimated_time": "10-12小時",
           "highlight": "台灣第二高峰，黑森林、圈谷美景"
+        },
+        {
+          "route_id": "xueshan_main_only",
+          "name": "雪山主峰精簡版",
+          "description": "跳過東峰，直攻雪山主峰的快速路線",
+          "days": 2,
+          "difficulty": "困難",
+          "total_distance": 19.0,
+          "trailhead": {
+            "name": "武陵農場登山口",
+            "lat": 24.3520,
+            "lon": 121.3080,
+            "elevation": 2140,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所", "補給站"]
+          },
+          "waypoints": [
+            {
+              "name": "七卡山莊",
+              "lat": 24.3720,
+              "lon": 121.2950,
+              "elevation": 2463,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "雪山主峰",
+              "lat": 24.3880,
+              "lon": 121.2330,
+              "elevation": 3886,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "9-10小時",
+          "highlight": "最快登頂雪山的路線選擇"
+        },
+        {
+          "route_id": "xueshan_west_ridge",
+          "name": "雪山西稜",
+          "description": "從環山部落出發，沿西稜攀登雪山，進階登山者的挑戰路線",
+          "days": 5,
+          "difficulty": "非常困難",
+          "total_distance": 48.0,
+          "trailhead": {
+            "name": "環山部落登山口",
+            "lat": 24.3150,
+            "lon": 121.2420,
+            "elevation": 1650,
+            "type": "trailhead",
+            "facilities": ["停車場", "民宿"]
+          },
+          "waypoints": [
+            {
+              "name": "大雪山",
+              "lat": 24.3450,
+              "lon": 121.2180,
+              "elevation": 3530,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "雪山北峰",
+              "lat": 24.3720,
+              "lon": 121.2280,
+              "elevation": 3703,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "雪山主峰",
+              "lat": 24.3880,
+              "lon": 121.2330,
+              "elevation": 3886,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "30-35小時",
+          "highlight": "雪山山脈縱走經典，高山生態豐富"
+        },
+        {
+          "route_id": "xueshan_east_single",
+          "name": "雪山東峰單攻",
+          "description": "從武陵農場單日往返雪山東峰，適合想體驗雪山的山友",
+          "days": 1,
+          "difficulty": "中等",
+          "total_distance": 13.0,
+          "trailhead": {
+            "name": "武陵農場登山口",
+            "lat": 24.3520,
+            "lon": 121.3080,
+            "elevation": 2140,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所", "補給站"]
+          },
+          "waypoints": [
+            {
+              "name": "雪山東峰",
+              "lat": 24.3850,
+              "lon": 121.2620,
+              "elevation": 3201,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "7-8小時",
+          "highlight": "單日即可體驗雪山黑森林美景"
+        }
+      ]
+    },
+    {
+      "area_id": "jiaming_lake",
+      "name": "嘉明湖地區",
+      "description": "天使的眼淚嘉明湖，台灣第二高的高山湖泊，包含三叉山、向陽山等百岳",
+      "country": "台灣",
+
+      "elevation_range": [2350, 3496],
+      "trail_count": 8,
+      "peak_count": 5,
+      "hut_count": 2,
+      "features": ["百岳", "高山湖泊", "山屋", "日出", "星空"],
+      "difficulty": "困難",
+      "popular_trails": ["嘉明湖三日", "向陽山", "三叉山"],
+      "routes": [
+        {
+          "route_id": "jiaming_lake_3days",
+          "name": "嘉明湖經典三日",
+          "description": "從向陽登山口經向陽山屋至嘉明湖，最經典的天使的眼淚行程",
+          "days": 3,
+          "difficulty": "困難",
+          "total_distance": 26.0,
+          "trailhead": {
+            "name": "向陽登山口",
+            "lat": 23.2850,
+            "lon": 121.0150,
+            "elevation": 2350,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "向陽山屋",
+              "lat": 23.2920,
+              "lon": 121.0380,
+              "elevation": 2850,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "嘉明湖避難山屋",
+              "lat": 23.2980,
+              "lon": 121.0580,
+              "elevation": 3350,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所"]
+            },
+            {
+              "name": "嘉明湖",
+              "lat": 23.2850,
+              "lon": 121.0650,
+              "elevation": 3310,
+              "type": "lake",
+              "required": true
+            }
+          ],
+          "estimated_time": "14-16小時",
+          "highlight": "天使的眼淚，台灣最美高山湖泊"
+        },
+        {
+          "route_id": "xiangyang_mountain",
+          "name": "向陽山加碼",
+          "description": "嘉明湖行程外加向陽山，多一座百岳收穫",
+          "days": 3,
+          "difficulty": "困難",
+          "total_distance": 28.5,
+          "trailhead": {
+            "name": "向陽登山口",
+            "lat": 23.2850,
+            "lon": 121.0150,
+            "elevation": 2350,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "向陽山屋",
+              "lat": 23.2920,
+              "lon": 121.0380,
+              "elevation": 2850,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "向陽山",
+              "lat": 23.2950,
+              "lon": 121.0450,
+              "elevation": 3603,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "嘉明湖",
+              "lat": 23.2850,
+              "lon": 121.0650,
+              "elevation": 3310,
+              "type": "lake",
+              "required": true
+            }
+          ],
+          "estimated_time": "15-18小時",
+          "highlight": "百岳加天使眼淚，一次滿足"
+        },
+        {
+          "route_id": "sanchashan_jiaming",
+          "name": "三叉山、嘉明湖縱走",
+          "description": "挑戰三叉山、向陽山雙百岳，再訪嘉明湖",
+          "days": 4,
+          "difficulty": "非常困難",
+          "total_distance": 35.0,
+          "trailhead": {
+            "name": "向陽登山口",
+            "lat": 23.2850,
+            "lon": 121.0150,
+            "elevation": 2350,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "向陽山屋",
+              "lat": 23.2920,
+              "lon": 121.0380,
+              "elevation": 2850,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "向陽山",
+              "lat": 23.2950,
+              "lon": 121.0450,
+              "elevation": 3603,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "三叉山",
+              "lat": 23.2920,
+              "lon": 121.0720,
+              "elevation": 3496,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "嘉明湖",
+              "lat": 23.2850,
+              "lon": 121.0650,
+              "elevation": 3310,
+              "type": "lake",
+              "required": true
+            }
+          ],
+          "estimated_time": "20-24小時",
+          "highlight": "雙百岳縱走，嘉明湖加值行程"
+        },
+        {
+          "route_id": "jiaming_lake_2days",
+          "name": "嘉明湖快閃二日",
+          "description": "體力好的山友可選擇二日快速往返嘉明湖",
+          "days": 2,
+          "difficulty": "非常困難",
+          "total_distance": 26.0,
+          "trailhead": {
+            "name": "向陽登山口",
+            "lat": 23.2850,
+            "lon": 121.0150,
+            "elevation": 2350,
+            "type": "trailhead",
+            "facilities": ["停車場", "廁所"]
+          },
+          "waypoints": [
+            {
+              "name": "向陽山屋",
+              "lat": 23.2920,
+              "lon": 121.0380,
+              "elevation": 2850,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "嘉明湖",
+              "lat": 23.2850,
+              "lon": 121.0650,
+              "elevation": 3310,
+              "type": "lake",
+              "required": true
+            }
+          ],
+          "estimated_time": "14-16小時",
+          "highlight": "時間有限的最佳選擇"
+        }
+      ]
+    },
+    {
+      "area_id": "nanhudashan",
+      "name": "南湖大山",
+      "description": "台灣五岳之一，帝王之山，包含南湖主峰、東峰、南峰等，以壯麗的圈谷地形聞名",
+      "country": "台灣",
+
+      "elevation_range": [1800, 3742],
+      "trail_count": 12,
+      "peak_count": 10,
+      "hut_count": 3,
+      "features": ["百岳", "五岳", "圈谷", "山屋", "高山草原"],
+      "difficulty": "非常困難",
+      "popular_trails": ["南湖大山主峰線", "南湖大山東峰", "南湖群峰縱走"],
+      "routes": [
+        {
+          "route_id": "nanhu_main",
+          "name": "南湖大山主峰五日",
+          "description": "從思源啞口經南湖登山口、雲稜山莊至南湖大山主峰，經典五日行程",
+          "days": 5,
+          "difficulty": "非常困難",
+          "total_distance": 36.0,
+          "trailhead": {
+            "name": "南湖-勝光登山口",
+            "lat": 24.3699184, 
+            "lon": 121.3405713,
+            "elevation": 1800,
+            "type": "trailhead",
+            "facilities": ["停車場"]
+          },
+          "waypoints": [
+            {
+              "name": "多加屯山",
+              "lat": 24.3720,
+              "lon": 121.4050,
+              "elevation": 3100,
+              "type": "waypoint",
+              "required": false
+            },
+            {
+              "name": "雲稜山莊",
+              "lat": 24.3780,
+              "lon": 121.4180,
+              "elevation": 3360,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "審馬陣山",
+              "lat": 24.3820,
+              "lon": 121.4280,
+              "elevation": 3141,
+              "type": "peak",
+              "required": false
+            },
+            {
+              "name": "南湖大山主峰",
+              "lat": 24.3680,
+              "lon": 121.4380,
+              "elevation": 3742,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "25-30小時",
+          "highlight": "帝王之山，南湖圈谷震撼人心"
+        },
+        {
+          "route_id": "nanhu_east",
+          "name": "南湖大山東峰加碼",
+          "description": "在主峰行程外加上南湖東峰，挑戰更高難度",
+          "days": 5,
+          "difficulty": "非常困難",
+          "total_distance": 40.0,
+          "trailhead": {
+            "name": "南湖登山口",
+            "lat": 24.3620,
+            "lon": 121.3850,
+            "elevation": 1800,
+            "type": "trailhead",
+            "facilities": ["停車場"]
+          },
+          "waypoints": [
+            {
+              "name": "雲稜山莊",
+              "lat": 24.3780,
+              "lon": 121.4180,
+              "elevation": 3360,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "南湖大山主峰",
+              "lat": 24.3680,
+              "lon": 121.4380,
+              "elevation": 3742,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "南湖大山東峰",
+              "lat": 24.3720,
+              "lon": 121.4450,
+              "elevation": 3632,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "28-32小時",
+          "highlight": "雙峰挑戰，南湖圈谷全覽"
+        },
+        {
+          "route_id": "nanhu_south",
+          "name": "南湖大山南峰縱走",
+          "description": "縱走南湖主峰、南峰，體驗真正的高山縱走",
+          "days": 6,
+          "difficulty": "非常困難",
+          "total_distance": 45.0,
+          "trailhead": {
+            "name": "南湖登山口",
+            "lat": 24.3620,
+            "lon": 121.3850,
+            "elevation": 1800,
+            "type": "trailhead",
+            "facilities": ["停車場"]
+          },
+          "waypoints": [
+            {
+              "name": "雲稜山莊",
+              "lat": 24.3780,
+              "lon": 121.4180,
+              "elevation": 3360,
+              "type": "hut",
+              "required": true,
+              "facilities": ["住宿", "廁所", "用水"]
+            },
+            {
+              "name": "南湖大山主峰",
+              "lat": 24.3680,
+              "lon": 121.4380,
+              "elevation": 3742,
+              "type": "peak",
+              "required": true
+            },
+            {
+              "name": "南湖南峰",
+              "lat": 24.3580,
+              "lon": 121.4420,
+              "elevation": 3505,
+              "type": "peak",
+              "required": true
+            }
+          ],
+          "estimated_time": "35-40小時",
+          "highlight": "南湖群峰深度之旅"
         }
       ]
     },
@@ -199,14 +896,15 @@
       "name": "測試區域",
       "description": "開發測試用的小區域",
       "country": "台灣",
-      "bbox": [23.4, 120.9, 23.5, 121.0],
+
       "elevation_range": [1000, 3000],
       "trail_count": 5,
       "peak_count": 3,
       "hut_count": 1,
       "features": ["測試"],
       "difficulty": "中等",
-      "popular_trails": ["測試步道"]
+      "popular_trails": ["測試步道"],
+      "routes": []
     }
   ]
 }
