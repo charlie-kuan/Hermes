@@ -2,30 +2,21 @@
 """Script to download OSM data for a hiking area."""
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.config import settings
 from app.core.osm_processor import OSMProcessor
+from app.utils.area_loader import load_all_areas, load_area_full
 from app.utils.cache import graph_cache
 from loguru import logger
 
 
 def load_areas():
-    """Load areas from areas.json."""
-    areas_file = settings.data_dir / "areas.json"
-
-    if not areas_file.exists():
-        logger.error(f"Areas file not found: {areas_file}")
-        return []
-
-    with open(areas_file, 'r') as f:
-        data = json.load(f)
-        return data.get('areas', [])
+    """Load areas from data/areas structure."""
+    return load_all_areas()
 
 
 def download_area(area_id: str, bbox: list = None):
@@ -40,20 +31,14 @@ def download_area(area_id: str, bbox: list = None):
 
     # Load area metadata if bbox not provided
     if bbox is None:
-        areas = load_areas()
-        area_data = None
-
-        for area in areas:
-            if area['area_id'] == area_id:
-                area_data = area
-                break
+        area_data = load_area_full(area_id)
 
         if not area_data:
-            logger.error(f"Area {area_id} not found in areas.json")
+            logger.error(f"Area {area_id} not found in data/areas")
             return False
 
         bbox = area_data['bbox']
-        logger.info(f"Using bbox from areas.json: {bbox}")
+        logger.info(f"Using bbox from data/areas: {bbox}")
 
     # Download and process
     osm_processor = OSMProcessor()

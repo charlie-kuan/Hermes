@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Map3D from './components/Map3D';
 import RouteForm from './components/RouteForm';
 import ResultsPanel from './components/ResultsPanel';
+import AdminPanel from './components/AdminPanel';
 import { apiService } from './services/api';
 import './App.css';
 
@@ -19,6 +20,7 @@ function App() {
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('plan'); // 'plan' or 'results'
+  const [adminOpen, setAdminOpen] = useState(false);
 
   // Check API health and load areas on mount
   useEffect(() => {
@@ -98,10 +100,16 @@ function App() {
           <h1>🏔️ Project Hermes</h1>
           <p>一站式登山行程規劃系統</p>
         </div>
-        <div className="header-status">
+        <div className="header-status" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span className={`status-indicator ${apiConnected ? 'connected' : ''}`}>
             {apiConnected ? '🟢 已連接' : '🔴 未連接'}
           </span>
+          <button
+            onClick={() => setAdminOpen(true)}
+            style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+          >
+            ⚙️ 管理
+          </button>
         </div>
       </header>
 
@@ -190,6 +198,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Admin Panel */}
+      {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
 
       {/* Toast Container */}
       <div id="toast-container"></div>

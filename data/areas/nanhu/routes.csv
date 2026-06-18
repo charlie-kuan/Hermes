@@ -1,0 +1,3 @@
+route_id,name,description,days,difficulty,estimated_distance,estimated_time,point_sequence,highlight
+nanhu_classic_5day,南湖大山五日經典行程,完整的南湖大山行程，適合一般登山者，原路折返,5,困難,42.0,20-24小時,nanhu_siyuan_trailhead>nanhu_duoga_cabin>nanhu_cloud_hut>nanhu_main_peak>nanhu_east_peak>nanhu_cloud_hut>nanhu_duoga_cabin>nanhu_siyuan_trailhead,帝王之山，中央山脈北一段精華
+nanhu_express_4day,南湖大山四日快速行程,壓縮行程，適合體能佳者,4,非常困難,42.0,18-22小時,nanhu_siyuan_trailhead>nanhu_cloud_hut>nanhu_main_peak>nanhu_east_peak>nanhu_cloud_hut>nanhu_siyuan_trailhead,快速登頂，適合有經驗者

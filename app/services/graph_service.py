@@ -23,6 +23,22 @@ class GraphService:
         self.gps_trace_processor = GPSTraceProcessor()
         self.loaded_graphs = {}  # In-memory cache
 
+    def _get_gps_trace_dir(self, area_id: str) -> Path:
+        """Get GPS trace directory for an area."""
+        return Path(settings.data_dir) / "gps_traces" / area_id
+
+    def _has_gps_trace_files(self, area_id: str) -> bool:
+        """Check whether an area has usable GPS trace files."""
+        gps_trace_dir = self._get_gps_trace_dir(area_id)
+        if not gps_trace_dir.exists():
+            return False
+
+        has_gpx = any(gps_trace_dir.glob("*.gpx"))
+        has_geojson = any(gps_trace_dir.glob("*.geojson"))
+        has_json = any(gps_trace_dir.glob("*.json"))
+
+        return has_gpx or has_geojson or has_json
+
     def get_or_build_graph(
         self, 
         area_id: str, 
@@ -45,7 +61,7 @@ class GraphService:
             NetworkX MultiDiGraph
 
         Raises:
-            GraphNotFoundError: If graph not found and bbox cannot be determined
+            GraphNotFoundError: If graph not found and neither bbox nor GPS traces are available
         """
         # Check in-memory cache
         if area_id in self.loaded_graphs:
@@ -55,10 +71,13 @@ class GraphService:
         # Check disk cache
         cached_graph = graph_cache.load_graph(area_id)
         if cached_graph is not None:
+            # Patch any known-correct elevations from CSV onto cached graph nodes
+            if area_data:
+                self._patch_known_elevations(cached_graph, area_data.get('points', []))
             self.loaded_graphs[area_id] = cached_graph
             return cached_graph
 
-        # Build new graph - determine bbox
+        # Build new graph - determine bbox (OSM path)
         if bbox is None:
             if area_data is not None:
                 # Auto-calculate bbox from routes
@@ -73,21 +92,67 @@ class GraphService:
                     logger.warning(f"Could not calculate bbox from routes: {e}")
                     # Fallback to legacy bbox from area_data if exists
                     bbox = area_data.get('bbox')
-            
+
             if bbox is None:
+                if self._has_gps_trace_files(area_id):
+                    logger.info(
+                        f"No bbox available for {area_id}; building graph directly from GPS traces"
+                    )
+                    return self.build_graph_from_gps_traces(area_id)
+
                 raise GraphNotFoundError(
-                    f"No cached graph for {area_id} and no bbox provided. "
-                    f"Either provide bbox explicitly, area_data with routes, or cached area_data with bbox."
+                    f"No cached graph for {area_id}, and neither bbox nor GPS traces are available. "
+                    f"Provide bbox/area_data routes or add trace files to data/gps_traces/{area_id}/"
                 )
 
         logger.info(f"Building new graph for area: {area_id}")
-        graph = self.osm_processor.download_trail_network(bbox, area_id)
+        try:
+            graph = self.osm_processor.download_trail_network(bbox, area_id)
+        except Exception as e:
+            if self._has_gps_trace_files(area_id):
+                logger.warning(
+                    f"OSM graph build failed for {area_id}: {e}. Falling back to GPS trace graph."
+                )
+                return self.build_graph_from_gps_traces(area_id)
+            raise
+
+        # Patch known-correct elevations from CSV before caching
+        if area_data:
+            self._patch_known_elevations(graph, area_data.get('points', []))
 
         # Cache the graph
         graph_cache.save_graph(area_id, graph)
         self.loaded_graphs[area_id] = graph
 
         return graph
+
+    def _patch_known_elevations(
+        self,
+        graph: nx.MultiDiGraph,
+        known_points: list,
+        radius_m: float = 300.0
+    ) -> None:
+        """
+        Overwrite elevation of OSM nodes that are close to a known CSV point
+        (trailhead, peak, hut) with the curated elevation from that CSV row.
+        This corrects bad SRTM values near named landmarks.
+        """
+        if not known_points:
+            return
+
+        for point in known_points:
+            try:
+                target_elev = float(point['elevation'])
+                p_lat = float(point['lat'])
+                p_lon = float(point['lon'])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            for node_id, data in graph.nodes(data=True):
+                node: Node = data['data']
+                dist = haversine_distance(node.lat, node.lon, p_lat, p_lon)
+                if dist <= radius_m:
+                    node.elevation = target_elev
 
     def find_nearest_node(
         self,

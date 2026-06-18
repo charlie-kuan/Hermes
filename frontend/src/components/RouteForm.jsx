@@ -10,12 +10,8 @@ export default function RouteForm({
 }) {
   const [formData, setFormData] = useState({
     area_id: '',
-    multi_day: false,
-    target_hours_per_day: 7,
     hiker_fitness: 'moderate',
     pack_weight_kg: 12,
-    prefer_huts: true,
-    avoid_difficult: false,
   });
 
   const [selectedArea, setSelectedArea] = useState(null);
@@ -46,10 +42,7 @@ export default function RouteForm({
         }));
         setSelectedPoints(points);
         setNextUniqueId(uniqueId);
-        setFormData(prev => ({
-          ...prev,
-          multi_day: route.days > 1
-        }));
+        setFormData(prev => ({ ...prev }));
       }
     }
   }, [quickSelectRoute, selectedArea]);
@@ -143,17 +136,10 @@ export default function RouteForm({
       end_lat: via_points[via_points.length - 1].lat,
       end_lon: via_points[via_points.length - 1].lon,
       loop_route: false,
-      multi_day: formData.multi_day,
       hiker_fitness: formData.hiker_fitness,
       pack_weight_kg: parseFloat(formData.pack_weight_kg),
-      prefer_huts: formData.prefer_huts,
-      avoid_difficult: formData.avoid_difficult,
       via_points: via_points.slice(1, -1) // Exclude first and last (they're start/end)
     };
-
-    if (formData.multi_day) {
-      params.target_hours_per_day = parseFloat(formData.target_hours_per_day);
-    }
 
     onSubmit(params);
   };
@@ -176,7 +162,7 @@ export default function RouteForm({
             <option value="">請選擇...</option>
             {areas.map(area => (
               <option key={area.area_id} value={area.area_id}>
-                {area.name} ({area.country})
+                {area.name}
               </option>
             ))}
           </select>
@@ -289,36 +275,6 @@ export default function RouteForm({
           </div>
         )}
 
-        {/* Multi-day */}
-        <div className="form-group">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              name="multi_day"
-              checked={formData.multi_day}
-              onChange={handleChange}
-            />
-            多日行程規劃
-          </label>
-        </div>
-
-        {/* Target Hours */}
-        {formData.multi_day && (
-          <div className="form-group">
-            <label htmlFor="target_hours_per_day">每日目標時數</label>
-            <input
-              type="number"
-              id="target_hours_per_day"
-              name="target_hours_per_day"
-              value={formData.target_hours_per_day}
-              onChange={handleChange}
-              min="4"
-              max="12"
-              step="0.5"
-            />
-          </div>
-        )}
-
         {/* Fitness Level */}
         <div className="form-group">
           <label htmlFor="hiker_fitness">體能水平</label>
@@ -347,31 +303,6 @@ export default function RouteForm({
             max="50"
             step="0.5"
           />
-        </div>
-
-        {/* Preferences */}
-        <div className="form-group">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              name="prefer_huts"
-              checked={formData.prefer_huts}
-              onChange={handleChange}
-            />
-            優先選擇山屋
-          </label>
-        </div>
-
-        <div className="form-group">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              name="avoid_difficult"
-              checked={formData.avoid_difficult}
-              onChange={handleChange}
-            />
-            避開困難路段
-          </label>
         </div>
 
         {/* Buttons */}

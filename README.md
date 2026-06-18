@@ -254,8 +254,8 @@ pytest tests/ -v --cov=app
 ### Adding New Hiking Areas
 
 1. Edit `data/areas.json` with new area metadata
-2. Define bounding box for OSM data download
-3. The graph will be built automatically on first route request
+2. Add area points/routes data (or GPS traces in `data/gps_traces/{area_id}/`)
+3. The graph will be built automatically on first route request (`bbox` is optional)
 
 Example:
 ```json
@@ -264,7 +264,6 @@ Example:
   "name": "Chamonix - Mont Blanc",
   "description": "Classic alpine trails around Mont Blanc",
   "country": "France",
-  "bbox": [45.8, 6.8, 46.0, 7.0],
   "elevation_range": [1000, 4800]
 }
 ```

@@ -1,6 +1,6 @@
 """Route planning endpoint handlers."""
 
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -10,7 +10,6 @@ from app.api.dependencies import (
     get_estimation_service,
     get_export_service,
     get_graph_service,
-    get_planning_service,
     get_recommendation_service,
     get_routing_service
 )
@@ -22,17 +21,14 @@ from app.exceptions import (
     RouteNotFoundError
 )
 from app.models.domain import (
-    DayPlan,
     EquipmentRecommendation,
     FoodRecommendation,
-    MultiDayPlan,
     Node,
     Route,
     RouteSegment
 )
 from app.models.requests import RoutePlanRequest, TimeEstimateRequest
 from app.models.responses import (
-    DayPlanResponse,
     EquipmentRecommendationResponse,
     FoodRecommendationResponse,
     NodeResponse,
@@ -43,7 +39,6 @@ from app.models.responses import (
 from app.services.estimation_service import EstimationService
 from app.services.export_service import ExportService
 from app.services.graph_service import GraphService
-from app.services.planning_service import PlanningService
 from app.services.recommendation_service import RecommendationService
 from app.services.routing_service import RoutingService
 
@@ -51,7 +46,54 @@ router = APIRouter()
 
 # In-memory route cache (in production, use Redis or similar)
 route_cache: Dict[str, Route] = {}
-multi_day_cache: Dict[str, MultiDayPlan] = {}
+
+
+def _resolve_node_id(
+    graph_service: GraphService,
+    graph,
+    lat: float,
+    lon: float,
+    nearest_max_distance: float = 2000.0,
+    edge_snap_max_distance: float = 3000.0
+) -> Optional[str]:
+    """Resolve a coordinate to an existing node or by edge snapping."""
+    node_id = graph_service.find_nearest_node(
+        graph, lat, lon, max_distance=nearest_max_distance
+    )
+    if node_id:
+        return node_id
+
+    return graph_service.find_or_create_node_at_point(
+        graph,
+        lat,
+        lon,
+        max_distance=edge_snap_max_distance,
+        split_edges=True
+    )
+
+
+def _build_retry_bbox(
+    start_lat: float,
+    start_lon: float,
+    end_lat: Optional[float],
+    end_lon: Optional[float],
+    padding_km: float = 6.0
+) -> list[float]:
+    """Build a small bbox around query points for rebuild fallback."""
+    lats = [start_lat]
+    lons = [start_lon]
+
+    if end_lat is not None and end_lon is not None:
+        lats.append(end_lat)
+        lons.append(end_lon)
+
+    padding_deg = padding_km / 111.0
+    return [
+        min(lats) - padding_deg,
+        min(lons) - padding_deg,
+        max(lats) + padding_deg,
+        max(lons) + padding_deg
+    ]
 
 
 def node_to_response(node: Node) -> NodeResponse:
@@ -69,6 +111,12 @@ def node_to_response(node: Node) -> NodeResponse:
 
 def segment_to_response(segment: RouteSegment) -> RouteSegmentResponse:
     """Convert RouteSegment to RouteSegmentResponse."""
+    # Include geometry with elevation (3-element lists) when available,
+    # fall back to 2-element [lat, lon] for points without elevation data.
+    geometry = [
+        [pt[0], pt[1], pt[2]] if len(pt) >= 3 else [pt[0], pt[1]]
+        for pt in (segment.geometry or [])
+    ]
     return RouteSegmentResponse(
         start_node=node_to_response(segment.start_node),
         end_node=node_to_response(segment.end_node),
@@ -77,24 +125,10 @@ def segment_to_response(segment: RouteSegment) -> RouteSegmentResponse:
         elevation_loss=segment.elevation_loss,
         estimated_time=segment.estimated_time,
         difficulty=segment.difficulty.name.lower(),
-        trail_name=segment.edge.trail_name
+        trail_name=segment.edge.trail_name,
+        geometry=geometry
     )
 
-
-def day_plan_to_response(day: DayPlan) -> DayPlanResponse:
-    """Convert DayPlan to DayPlanResponse."""
-    return DayPlanResponse(
-        day_number=day.day_number,
-        segments=[segment_to_response(s) for s in day.segments],
-        start_node=node_to_response(day.start_node),
-        end_node=node_to_response(day.end_node),
-        total_distance=day.total_distance,
-        total_elevation_gain=day.total_elevation_gain,
-        total_elevation_loss=day.total_elevation_loss,
-        estimated_time=day.estimated_time,
-        difficulty=day.difficulty.name.lower(),
-        overnight_stop=node_to_response(day.overnight_stop) if day.overnight_stop else None
-    )
 
 
 @router.post("/routes/plan", response_model=RouteResponse, tags=["Routes"])
@@ -103,14 +137,12 @@ async def plan_route(
     graph_service: GraphService = Depends(get_graph_service),
     routing_service: RoutingService = Depends(get_routing_service),
     estimation_service: EstimationService = Depends(get_estimation_service),
-    planning_service: PlanningService = Depends(get_planning_service),
     recommendation_service: RecommendationService = Depends(get_recommendation_service)
 ):
     """
     Plan a hiking route.
 
-    Creates a complete route plan with time estimates, multi-day splits (if requested),
-    and equipment/food recommendations.
+    Creates a complete route plan with time estimates and equipment/food recommendations.
 
     Args:
         request: Route planning parameters
@@ -139,28 +171,79 @@ async def plan_route(
         )
 
         # Find start node
-        start_node_id = graph_service.find_nearest_node(
-            graph, request.start_lat, request.start_lon
+        start_node_id = _resolve_node_id(
+            graph_service,
+            graph,
+            request.start_lat,
+            request.start_lon,
+            nearest_max_distance=2000.0,
+            edge_snap_max_distance=3000.0
         )
+
+        # Retry path: stale/too-small cached graph can miss nearby trails
+        if not start_node_id:
+            logger.warning(
+                f"Start node not found for {request.area_id}; rebuilding graph with expanded query bbox"
+            )
+            retry_bbox = _build_retry_bbox(
+                request.start_lat,
+                request.start_lon,
+                request.end_lat,
+                request.end_lon,
+                padding_km=6.0
+            )
+
+            graph_service.clear_cache(request.area_id)
+            graph = graph_service.get_or_build_graph(
+                request.area_id,
+                bbox=retry_bbox,
+                area_data=area_data
+            )
+
+            start_node_id = _resolve_node_id(
+                graph_service,
+                graph,
+                request.start_lat,
+                request.start_lon,
+                nearest_max_distance=5000.0,
+                edge_snap_max_distance=5000.0
+            )
 
         if not start_node_id:
             raise HTTPException(
                 status_code=400,
-                detail=f"No trail found within 2km of start coordinates ({request.start_lat:.5f}, {request.start_lon:.5f}). "
+                  detail=f"No trail found within 2km of start coordinates ({request.start_lat:.5f}, {request.start_lon:.5f}) "
+                      f"(including 3km edge-snap fallback and 5km retry after graph rebuild). "
                        f"Please select a location closer to the trail network."
             )
 
         # Find end node (if not loop)
         end_node_id = None
         if not request.loop_route and request.end_lat and request.end_lon:
-            end_node_id = graph_service.find_nearest_node(
-                graph, request.end_lat, request.end_lon
+            end_node_id = _resolve_node_id(
+                graph_service,
+                graph,
+                request.end_lat,
+                request.end_lon,
+                nearest_max_distance=2000.0,
+                edge_snap_max_distance=3000.0
             )
+
+            if not end_node_id:
+                end_node_id = _resolve_node_id(
+                    graph_service,
+                    graph,
+                    request.end_lat,
+                    request.end_lon,
+                    nearest_max_distance=5000.0,
+                    edge_snap_max_distance=5000.0
+                )
 
             if not end_node_id:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"No trail found within 2km of end coordinates ({request.end_lat:.5f}, {request.end_lon:.5f}). "
+                    detail=f"No trail found within 2km of end coordinates ({request.end_lat:.5f}, {request.end_lon:.5f}) "
+                              f"(including 3km edge-snap fallback and 5km retry after graph rebuild). "
                            f"Please select a location closer to the trail network."
                 )
 
@@ -176,19 +259,12 @@ async def plan_route(
                     if via_id:
                         via_node_ids.append(via_id)
 
-        # Set preferences
-        preferences = None
-        if request.avoid_difficult:
-            preferences = {'distance': 0.8, 'elevation': 0.5, 'difficulty': 1.5}
-
         # Plan the route
         route = routing_service.plan_route(
             graph,
             start_node_id,
             end_node_id,
             via_nodes=via_node_ids,
-            preferences=preferences,
-            avoid_difficult=request.avoid_difficult
         )
 
         route.area_id = request.area_id
@@ -213,28 +289,11 @@ async def plan_route(
             conservative=conservative
         )
 
-        # Multi-day planning
-        multi_day_plan = None
-        if request.multi_day and request.target_hours_per_day:
-            multi_day_plan = planning_service.split_into_days(
-                route,
-                graph,
-                request.target_hours_per_day,
-                request.prefer_huts,
-                request.hiker_fitness,
-                request.pack_weight_kg
-            )
-
-            # Cache multi-day plan
-            multi_day_cache[route.route_id] = multi_day_plan
-
         # Generate recommendations
-        equipment = recommendation_service.recommend_equipment(
-            route, multi_day_plan
-        )
+        equipment = recommendation_service.recommend_equipment(route)
 
         food = recommendation_service.recommend_food(
-            route, multi_day_plan, request.hiker_fitness, request.pack_weight_kg
+            route, request.hiker_fitness, request.pack_weight_kg
         )
 
         # Cache route
@@ -252,7 +311,6 @@ async def plan_route(
             difficulty=route.difficulty.name.lower(),
             is_loop=route.is_loop,
             waypoints=[node_to_response(w) for w in route.waypoints],
-            multi_day=request.multi_day,
             equipment=[
                 EquipmentRecommendationResponse(
                     category=e.category,
@@ -267,14 +325,6 @@ async def plan_route(
                 notes=food.notes
             )
         )
-
-        # Add multi-day details
-        if multi_day_plan:
-            response.days = [day_plan_to_response(day) for day in multi_day_plan.days]
-            response.total_days = multi_day_plan.total_days
-            response.overnight_stops = [
-                node_to_response(stop) for stop in multi_day_plan.overnight_stops
-            ]
 
         logger.info(f"Created route {route.route_id}: {route.total_distance:.1f}km, {normal:.1f}h")
 
@@ -310,7 +360,6 @@ async def get_route(
         raise HTTPException(status_code=404, detail=f"Route {route_id} not found")
 
     route = route_cache[route_id]
-    multi_day_plan = multi_day_cache.get(route_id)
 
     # Get time estimates
     optimistic, normal, conservative = estimation_service.estimate_route(route)
@@ -321,8 +370,7 @@ async def get_route(
         conservative=conservative
     )
 
-    # Build response
-    response = RouteResponse(
+    return RouteResponse(
         route_id=route.route_id,
         area_id=route.area_id or "unknown",
         segments=[segment_to_response(s) for s in route.segments],
@@ -333,18 +381,7 @@ async def get_route(
         difficulty=route.difficulty.name.lower(),
         is_loop=route.is_loop,
         waypoints=[node_to_response(w) for w in route.waypoints],
-        multi_day=multi_day_plan is not None
     )
-
-    # Add multi-day details
-    if multi_day_plan:
-        response.days = [day_plan_to_response(day) for day in multi_day_plan.days]
-        response.total_days = multi_day_plan.total_days
-        response.overnight_stops = [
-            node_to_response(stop) for stop in multi_day_plan.overnight_stops
-        ]
-
-    return response
 
 
 @router.get("/routes/{route_id}/export", tags=["Routes"])

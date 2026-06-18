@@ -195,18 +195,12 @@ class OSMProcessor:
             # Get edge attributes
             osm_popularity = self._calculate_popularity_score(data)
 
-            # Extract geometry from edges_gdf if available
+            # Extract geometry from edges_gdf — index is (u, v, key)
             geometry = []
             try:
-                # Find the corresponding edge in the GeoDataFrame
-                edge_row = edges_gdf[(edges_gdf['u'] == u) & (edges_gdf['v'] == v) & (edges_gdf['key'] == key)]
-                if not edge_row.empty and hasattr(edge_row.iloc[0], 'geometry'):
-                    geom = edge_row.iloc[0].geometry
-                    if geom is not None and hasattr(geom, 'coords'):
-                        # Extract coordinates from LineString
-                        # OSM geometry is (lon, lat), we need (lat, lon)
-                        geometry = [(lat, lon) for lon, lat in geom.coords]
-                        logger.debug(f"Extracted {len(geometry)} points from edge {u}->{v}")
+                geom = edges_gdf.loc[(u, v, key), 'geometry']
+                if geom is not None and hasattr(geom, 'coords'):
+                    geometry = [(lat, lon) for lon, lat in geom.coords]
             except Exception as e:
                 logger.debug(f"Could not extract geometry for edge {u}->{v}: {e}")
 
@@ -322,14 +316,13 @@ class OSMProcessor:
                     node.elevation = elevation
                     nodes_with_elevation += 1
                 else:
-                    # Use reasonable default based on Taiwan mountain ranges
-                    node.elevation = 2000.0
+                    node.elevation = None
                     nodes_failed += 1
-                    logger.debug(f"No elevation data for node {node_id} at ({node.lat:.4f}, {node.lon:.4f}), using default")
+                    logger.debug(f"No elevation data for node {node_id} at ({node.lat:.4f}, {node.lon:.4f})")
 
             except Exception as e:
                 logger.debug(f"Error fetching elevation for node {node_id}: {e}")
-                node.elevation = 2000.0
+                node.elevation = None
                 nodes_failed += 1
 
             nodes_processed += 1
@@ -379,8 +372,9 @@ class OSMProcessor:
 
                         edge.geometry = geometry_with_elevation
 
-                        # Calculate gain/loss from elevation profile
-                        gain, loss = self.elevation_processor.calculate_elevation_gain_loss(elevations)
+                        # Smooth before calculating to reduce SRTM noise
+                        smoothed = self.elevation_processor.smooth_elevation_profile(elevations, window_size=11)
+                        gain, loss = self.elevation_processor.calculate_elevation_gain_loss(smoothed)
                         edge.elevation_gain = gain
                         edge.elevation_loss = loss
 
@@ -412,7 +406,9 @@ class OSMProcessor:
 
     def _calculate_simple_elevation_diff(self, edge: Edge, source_node: Node, target_node: Node) -> None:
         """Calculate simple elevation gain/loss from start and end points."""
-        elev_diff = target_node.elevation - source_node.elevation
+        src_elev = source_node.elevation or 0.0
+        tgt_elev = target_node.elevation or 0.0
+        elev_diff = tgt_elev - src_elev
 
         if elev_diff > 0:
             edge.elevation_gain = elev_diff

@@ -15,6 +15,7 @@ from loguru import logger
 
 from app.services.graph_service import GraphService
 from app.config import settings
+from app.utils.area_loader import load_area_full
 
 
 def main():
@@ -32,10 +33,11 @@ def main():
     logger.info(f"\n1. Loading graph for {area_id}")
     
     try:
-        # Get or build graph - for example purposes, using explicit bbox
-        # In production, pass area_data for auto-calculation
-        bbox = [23.4, 120.8, 23.6, 121.0]  # Example: Yushan area
-        graph = graph_service.get_or_build_graph(area_id, bbox=bbox)
+        # Get or build graph without explicit bbox:
+        # 1) auto-calculate from area routes if available
+        # 2) fallback to GPS-trace-based graph if bbox is unavailable
+        area_data = load_area_full(area_id)
+        graph = graph_service.get_or_build_graph(area_id, area_data=area_data)
         
         logger.info(f"   Graph loaded: {graph.number_of_nodes()} nodes, "
                    f"{graph.number_of_edges()} edges")

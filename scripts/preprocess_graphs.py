@@ -2,29 +2,20 @@
 """Script to preprocess and cache graphs for hiking areas."""
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.config import settings
 from app.services.graph_service import GraphService
+from app.utils.area_loader import load_all_areas, load_area_full
 from loguru import logger
 
 
 def load_areas():
-    """Load areas from areas.json."""
-    areas_file = settings.data_dir / "areas.json"
-
-    if not areas_file.exists():
-        logger.error(f"Areas file not found: {areas_file}")
-        return []
-
-    with open(areas_file, 'r') as f:
-        data = json.load(f)
-        return data.get('areas', [])
+    """Load areas from data/areas structure."""
+    return load_all_areas()
 
 
 def preprocess_area(area_id: str):
@@ -37,16 +28,10 @@ def preprocess_area(area_id: str):
     logger.info(f"Preprocessing area: {area_id}")
 
     # Load area metadata
-    areas = load_areas()
-    area_data = None
-
-    for area in areas:
-        if area['area_id'] == area_id:
-            area_data = area
-            break
+    area_data = load_area_full(area_id)
 
     if not area_data:
-        logger.error(f"Area {area_id} not found in areas.json")
+        logger.error(f"Area {area_id} not found in data/areas")
         return False
 
     # Build graph - bbox auto-calculated from routes

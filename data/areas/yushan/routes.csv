@@ -1,0 +1,5 @@
+route_id,name,description,days,difficulty,estimated_distance,estimated_time,point_sequence,highlight
+yushan_main_2day,玉山主峰二日經典行程,夜宿排雲山莊，登頂玉山主峰觀日出，原路折返,2,簡易,21.2,10-12小時,yushan_tataka_trailhead>yushan_paiyun_hut>yushan_main_peak>yushan_paiyun_hut>yushan_tataka_trailhead,
+yushan_main_single,玉山主峰單攻,當日往返，挑戰體能極限,1,中等,21.2,14-16小時,yushan_tataka_trailhead>yushan_paiyun_hut>yushan_main_peak>yushan_paiyun_hut>yushan_tataka_trailhead,適合體能佳的登山者
+yushan_front_peak,玉山前峰單日,適合單日往返的高山健行,1,簡易,12.0,6-7小時,yushan_tataka_trailhead>yushan_front_peak>yushan_tataka_trailhead,絕佳展望，可遠眺玉山主峰
+yushan_east_3day,玉山東峰三日縱走,玉山主峰+東峰，深度探索,3,非常困難,28.5,18-20小時,yushan_tataka_trailhead>yushan_paiyun_hut>yushan_main_peak>yushan_east_peak>yushan_paiyun_hut>yushan_tataka_trailhead,挑戰玉山兩大高峰

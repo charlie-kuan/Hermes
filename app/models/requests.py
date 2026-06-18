@@ -31,18 +31,11 @@ class RoutePlanRequest(BaseModel):
         description="Required waypoint types (peak, hut, etc.)"
     )
 
-    # Multi-day Planning
-    multi_day: bool = Field(default=False, description="Plan as multi-day route")
-    target_hours_per_day: Optional[float] = Field(7.0, gt=0, le=12, description="Target hiking hours per day")
-
     # Hiker Parameters
     hiker_fitness: str = Field(default="moderate", description="Fitness level: beginner, moderate, expert")
     pack_weight_kg: Optional[float] = Field(12.0, ge=0, le=50, description="Backpack weight in kg")
 
     # Preferences
-    prefer_huts: bool = Field(default=True, description="Prefer routes with huts for overnight stops")
-    avoid_difficult: bool = Field(default=False, description="Avoid difficult/expert trails")
-
     @field_validator("hiker_fitness")
     @classmethod
     def validate_fitness(cls, v: str) -> str:

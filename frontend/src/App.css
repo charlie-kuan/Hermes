@@ -384,6 +384,23 @@
   color: var(--text-primary);
 }
 
+.collapsible-header {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collapsible-header:hover {
+  opacity: 0.8;
+}
+
+.collapse-icon {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

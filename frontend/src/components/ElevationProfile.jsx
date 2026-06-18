@@ -33,46 +33,129 @@ export default function ElevationProfile({ route }) {
   const distanceData = [];
   let cumulativeDistance = 0;
 
-  // Add starting point
+  // Get elevation from a geometry point (returns null if not a 3D point)
+  const geomElev = (point) =>
+    point && point.length >= 3 && point[2] != null ? point[2] : null;
+
+  // Find first valid geometry elevation in a segment's geometry array
+  const firstGeomElev = (geom) => {
+    if (!geom) return null;
+    for (const p of geom) { const e = geomElev(p); if (e !== null) return e; }
+    return null;
+  };
+  const lastGeomElev = (geom) => {
+    if (!geom) return null;
+    for (let i = geom.length - 1; i >= 0; i--) { const e = geomElev(geom[i]); if (e !== null) return e; }
+    return null;
+  };
+
+  // Add starting point — prefer geometry[0] DEM elevation over node tag, null if unknown
   if (route.segments.length > 0) {
-    const firstSegment = route.segments[0];
-    elevationData.push(firstSegment.start_node.elevation || 0);
+    const firstSeg = route.segments[0];
+    const startElev = firstGeomElev(firstSeg.geometry) ?? firstSeg.start_node.elevation ?? null;
+    elevationData.push(startElev);
     distanceData.push(0);
   }
 
   // Process each segment
   route.segments.forEach((segment) => {
-    const startElevation = segment.start_node.elevation || 0;
-    const endElevation = segment.end_node.elevation || 0;
-
-    // If segment has detailed geometry with elevation data
     if (segment.geometry && segment.geometry.length > 1) {
-      const numPoints = segment.geometry.length;
-      segment.geometry.forEach((point, idx) => {
-        if (idx > 0) { // Skip first point as it's the same as previous segment's end
-          // Check if point has elevation data (3D point: [lat, lon, elevation])
-          let elevation;
-          if (point.length >= 3 && point[2] != null) {
-            // Use DEM elevation data from backend
-            elevation = point[2];
-          } else {
-            // Fallback to linear interpolation
-            const elevationRatio = idx / (numPoints - 1);
-            elevation = startElevation + (endElevation - startElevation) * elevationRatio;
-          }
+      const geom = segment.geometry;
+      const numPoints = geom.length;
 
-          cumulativeDistance += segment.distance / (numPoints - 1);
-          elevationData.push(elevation);
-          distanceData.push(cumulativeDistance);
+      // Use geometry-derived endpoints for interpolation; null if truly unknown
+      const interpStart = firstGeomElev(geom) ?? segment.start_node.elevation ?? null;
+      const interpEnd   = lastGeomElev(geom)  ?? segment.end_node.elevation   ?? null;
+
+      geom.forEach((point, idx) => {
+        if (idx === 0) return;
+        let elevation = geomElev(point);
+        if (elevation === null && interpStart !== null && interpEnd !== null) {
+          elevation = interpStart + (interpEnd - interpStart) * (idx / (numPoints - 1));
         }
+        cumulativeDistance += segment.distance / (numPoints - 1);
+        elevationData.push(elevation); // may be null — filled in below
+        distanceData.push(cumulativeDistance);
       });
     } else {
-      // Use end point elevation if no detailed geometry
       cumulativeDistance += segment.distance;
-      elevationData.push(endElevation);
+      elevationData.push(segment.end_node.elevation ?? null);
       distanceData.push(cumulativeDistance);
     }
   });
+
+  // Fill null gaps with linear interpolation between known neighbours
+  const interpolateNulls = (data) => {
+    const out = [...data];
+    let i = 0;
+    while (i < out.length) {
+      if (out[i] === null) {
+        const lo = i - 1;
+        let hi = i + 1;
+        while (hi < out.length && out[hi] === null) hi++;
+        if (lo >= 0 && hi < out.length) {
+          for (let j = i; j < hi; j++)
+            out[j] = out[lo] + (out[hi] - out[lo]) * ((j - lo) / (hi - lo));
+        } else if (lo >= 0) {
+          for (let j = i; j < out.length; j++) out[j] = out[lo];
+        } else if (hi < out.length) {
+          for (let j = 0; j < hi; j++) out[j] = out[hi];
+        }
+        i = hi;
+      } else {
+        i++;
+      }
+    }
+    return out;
+  };
+  const filled = interpolateNulls(elevationData);
+  for (let i = 0; i < elevationData.length; i++) elevationData[i] = filled[i] ?? 0;
+
+  // Remove outliers using a large window median filter, run 3 passes so clusters
+  // of bad SRTM points don't corrupt each other's median.
+  const filterOutliers = (data, window = 25, threshold = 200) => {
+    const out = [...data];
+    for (let i = 0; i < out.length; i++) {
+      const lo = Math.max(0, i - window);
+      const hi = Math.min(out.length, i + window + 1);
+      const sorted = out.slice(lo, hi).slice().sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      if (Math.abs(out[i] - median) > threshold) {
+        out[i] = median;
+      }
+    }
+    return out;
+  };
+  // 1. Remove gross outliers (bad DEM pixels) with 3-pass median filter
+  let filtered = filterOutliers(elevationData);
+  filtered = filterOutliers(filtered);
+  filtered = filterOutliers(filtered);
+
+  // 2. Smooth remaining DEM noise with a Gaussian-weighted moving average.
+  //    Window ≈ 200 m worth of points; clip to at least 3 so short segments still smooth.
+  const smoothProfile = (data, halfWin = 5) => {
+    if (data.length <= 2) return data;
+    // Gaussian weights (σ = halfWin/2)
+    const sigma = halfWin / 2;
+    const weights = Array.from({ length: 2 * halfWin + 1 }, (_, k) => {
+      const d = k - halfWin;
+      return Math.exp(-(d * d) / (2 * sigma * sigma));
+    });
+    return data.map((_, i) => {
+      let wSum = 0, vSum = 0;
+      for (let k = -halfWin; k <= halfWin; k++) {
+        const j = i + k;
+        if (j < 0 || j >= data.length) continue;
+        const w = weights[k + halfWin];
+        vSum += data[j] * w;
+        wSum += w;
+      }
+      return vSum / wSum;
+    });
+  };
+  filtered = smoothProfile(filtered, 5);
+
+  for (let i = 0; i < elevationData.length; i++) elevationData[i] = filtered[i];
 
   // Calculate stats
   const maxElevation = Math.max(...elevationData);

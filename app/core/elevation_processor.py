@@ -33,7 +33,8 @@ class ElevationProcessor:
         # Local DEM files
         self.dem_files = []
         self.dem_datasets = []  # Keep datasets open for performance
-        
+        self._dem_transformers = []  # Cached coordinate transformers (one per dataset)
+
         if settings.use_local_dem and RASTERIO_AVAILABLE:
             self._load_local_dem_files()
         
@@ -58,6 +59,13 @@ class ElevationProcessor:
                     dataset = rasterio.open(dem_file)
                     self.dem_datasets.append(dataset)
                     self.dem_files.append(dem_file)
+                    # Pre-build transformer for this dataset's CRS
+                    try:
+                        from pyproj import Transformer
+                        transformer = Transformer.from_crs("EPSG:4326", dataset.crs, always_xy=True)
+                        self._dem_transformers.append(transformer)
+                    except Exception:
+                        self._dem_transformers.append(None)
                     logger.info(f"Loaded DEM file: {dem_file.name} (bounds: {dataset.bounds})")
                 except Exception as e:
                     logger.warning(f"Failed to load DEM file {dem_file}: {e}")
@@ -113,23 +121,12 @@ class ElevationProcessor:
         Returns:
             Elevation in meters or None if not in any DEM coverage
         """
-        for dataset in self.dem_datasets:
+        for i, dataset in enumerate(self.dem_datasets):
             try:
-                # Get DEM's coordinate reference system
-                dem_crs = dataset.crs
-                
-                # If DEM is not in WGS84, transform coordinates
-                if dem_crs and dem_crs.to_epsg() != 4326:
-                    try:
-                        from pyproj import Transformer
-                        # Create transformer from WGS84 to DEM's CRS
-                        transformer = Transformer.from_crs("EPSG:4326", dem_crs, always_xy=True)
-                        x, y = transformer.transform(lon, lat)
-                    except Exception as e:
-                        logger.debug(f"Coordinate transformation failed: {e}")
-                        continue
+                transformer = self._dem_transformers[i] if i < len(self._dem_transformers) else None
+                if transformer is not None:
+                    x, y = transformer.transform(lon, lat)
                 else:
-                    # DEM is in WGS84, use directly
                     x, y = lon, lat
                 
                 # Check if point is within bounds
@@ -195,11 +192,12 @@ class ElevationProcessor:
         gain = 0.0
         loss = 0.0
 
+        threshold = 10.0  # used on smoothed profiles; 10 m catches real steps
         for i in range(1, len(elevations)):
             diff = elevations[i] - elevations[i - 1]
-            if diff > 0:
+            if diff > threshold:
                 gain += diff
-            else:
+            elif diff < -threshold:
                 loss += abs(diff)
 
         return gain, loss
@@ -250,36 +248,38 @@ class ElevationProcessor:
         Returns:
             List with interpolated values
         """
-        result = []
-        last_valid = None
-        last_valid_idx = -1
+        n = len(elevations)
+        valid_indices = [i for i, e in enumerate(elevations) if e is not None]
 
-        # First pass: forward fill
-        for i, elev in enumerate(elevations):
-            if elev is not None:
-                result.append(float(elev))
-                last_valid = float(elev)
-                last_valid_idx = i
-            elif last_valid is not None:
-                result.append(last_valid)
+        if not valid_indices:
+            return [0.0] * n
+
+        # Linear interpolation between all valid points; extrapolate at edges
+        result = [0.0] * n
+        for i in range(n):
+            if elevations[i] is not None:
+                result[i] = float(elevations[i])
             else:
-                result.append(0.0)  # Default if no valid value yet
+                # Find surrounding valid indices
+                prev_idx = next((j for j in reversed(valid_indices) if j < i), None)
+                next_idx = next((j for j in valid_indices if j > i), None)
 
-        # Second pass: linear interpolation
-        for i in range(len(result)):
-            if elevations[i] is None and last_valid_idx >= 0:
-                # Find next valid value
-                next_valid_idx = None
-                for j in range(i + 1, len(elevations)):
-                    if elevations[j] is not None:
-                        next_valid_idx = j
-                        break
+                if prev_idx is not None and next_idx is not None:
+                    ratio = (i - prev_idx) / (next_idx - prev_idx)
+                    result[i] = float(elevations[prev_idx]) + ratio * (float(elevations[next_idx]) - float(elevations[prev_idx]))
+                elif prev_idx is not None:
+                    result[i] = float(elevations[prev_idx])
+                else:
+                    result[i] = float(elevations[next_idx])
 
-                if next_valid_idx is not None:
-                    # Linear interpolation
-                    prev_elev = result[last_valid_idx]
-                    next_elev = elevations[next_valid_idx]
-                    ratio = (i - last_valid_idx) / (next_valid_idx - last_valid_idx)
-                    result[i] = prev_elev + ratio * (next_elev - prev_elev)
-
-        return result
+        # Remove outliers: replace points deviating >200m from local median
+        window = 5
+        filtered = result[:]
+        for i in range(n):
+            lo = max(0, i - window)
+            hi = min(n, i + window + 1)
+            neighbors = sorted(result[lo:hi])
+            median = neighbors[len(neighbors) // 2]
+            if abs(result[i] - median) > 200:
+                filtered[i] = median
+        return filtered

@@ -7,7 +7,6 @@ from loguru import logger
 from app.models.domain import (
     EquipmentRecommendation,
     FoodRecommendation,
-    MultiDayPlan,
     Route,
     TrailDifficulty
 )
@@ -22,7 +21,6 @@ class RecommendationService:
     def recommend_equipment(
         self,
         route: Route,
-        multi_day_plan: MultiDayPlan = None,
         season: str = "summer"
     ) -> List[EquipmentRecommendation]:
         """
@@ -30,7 +28,6 @@ class RecommendationService:
 
         Args:
             route: Route to recommend equipment for
-            multi_day_plan: Optional multi-day plan
             season: Season (summer, winter, spring, fall)
 
         Returns:
@@ -60,33 +57,6 @@ class RecommendationService:
         recommendations.append(
             EquipmentRecommendation(category="essential", items=essential_items)
         )
-
-        # Multi-day specific items
-        if multi_day_plan and multi_day_plan.total_days > 1:
-            overnight_items = [
-                "適合溫度等級的睡袋",
-                "睡墊",
-                "帳篷或遮蔽物",
-                "炊煮系統（爐具、燃料、鍋具）",
-                "食物收納袋/防熊罐",
-                "盥洗用具與衛生紙",
-                "淨水設備（濾水器或淨水錠）"
-            ]
-
-            # Check if huts are available
-            has_huts = any(
-                stop.node_type.value == 'hut'
-                for stop in multi_day_plan.overnight_stops
-            )
-
-            if has_huts:
-                overnight_items.append("山屋睡袋內袋（山屋通常提供毛毯）")
-            else:
-                overnight_items.append("需完整露營裝備（無山屋）")
-
-            recommendations.append(
-                EquipmentRecommendation(category="overnight", items=overnight_items)
-            )
 
         # Clothing recommendations
         clothing_items = [
@@ -146,7 +116,6 @@ class RecommendationService:
     def recommend_food(
         self,
         route: Route,
-        multi_day_plan: MultiDayPlan = None,
         fitness_level: str = "moderate",
         pack_weight_kg: float = 12.0
     ) -> FoodRecommendation:
@@ -155,39 +124,22 @@ class RecommendationService:
 
         Args:
             route: Route to plan food for
-            multi_day_plan: Optional multi-day plan
             fitness_level: Hiker fitness level
             pack_weight_kg: Pack weight
 
         Returns:
             FoodRecommendation with calorie and water needs
         """
-        # Calculate calories burned per day
         from app.core.time_estimators import TimeEstimator
         time_estimator = TimeEstimator()
 
-        if multi_day_plan:
-            # Multi-day route
-            total_days = multi_day_plan.total_days
-
-            # Calculate average calories per day
-            total_calories = time_estimator.estimate_calories_burned(
-                route.total_distance,
-                route.total_elevation_gain,
-                pack_weight_kg
-            )
-
-            daily_calories = int(total_calories / max(1, total_days))
-
-        else:
-            # Single day
-            total_days = 1
-            daily_calories = time_estimator.estimate_calories_burned(
-                route.total_distance,
-                route.total_elevation_gain,
-                pack_weight_kg
-            )
-            total_calories = daily_calories
+        total_days = 1
+        daily_calories = time_estimator.estimate_calories_burned(
+            route.total_distance,
+            route.total_elevation_gain,
+            pack_weight_kg
+        )
+        total_calories = daily_calories
 
         # Adjust for difficulty and effort
         if route.difficulty == TrailDifficulty.EXPERT:
@@ -199,8 +151,7 @@ class RecommendationService:
         daily_calories = max(2200, min(4500, daily_calories))
         total_calories = daily_calories * total_days
 
-        # Calculate meals per day
-        meals_per_day = 3 if total_days > 1 else 1
+        meals_per_day = 1
 
         # Calculate water needs
         base_water = 2.5  # liters per day
@@ -224,26 +175,7 @@ class RecommendationService:
             "攜帶高熱量、輕量化食物（果乾、堅果、能量棒）"
         ]
 
-        if multi_day_plan and multi_day_plan.total_days > 1:
-            notes.extend([
-                "準備冷凍乾燥餐包作為晚餐",
-                "額外攜帶行動糧以補充體力",
-                "考慮沿途補給點（如有）"
-            ])
-
-            # Check for water sources
-            has_water_sources = any(
-                'water' in stop.amenities
-                for stop in multi_day_plan.overnight_stops
-            )
-
-            if has_water_sources:
-                notes.append("過夜點有水源 - 請攜帶淨水設備")
-            else:
-                notes.append("水源有限 - 需規劃攜帶足夠水量")
-
-        else:
-            notes.append("Carry enough water for the entire hike or know water source locations")
+        notes.append("Carry enough water for the entire hike or know water source locations")
 
         if route.difficulty in [TrailDifficulty.DIFFICULT, TrailDifficulty.EXPERT]:
             notes.append("High-intensity route - pack extra electrolyte supplements")

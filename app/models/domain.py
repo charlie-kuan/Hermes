@@ -10,8 +10,9 @@ class NodeType(Enum):
     TRAILHEAD = "trailhead"
     INTERSECTION = "intersection"
     PEAK = "peak"
-    HUT = "hut"
-    CAMPSITE = "campsite"
+    SHELTER = "shelter"
+    HUT = "hut"       # legacy
+    CAMPSITE = "campsite"  # legacy
     WATER_SOURCE = "water_source"
     VIEWPOINT = "viewpoint"
     GENERIC = "generic"
@@ -102,29 +103,6 @@ class Route:
     is_loop: bool = False
     area_id: Optional[str] = None
 
-
-@dataclass
-class DayPlan:
-    """A single day's plan in a multi-day route."""
-    day_number: int
-    segments: List[RouteSegment]
-    start_node: Node
-    end_node: Node
-    total_distance: float  # km
-    total_elevation_gain: float  # meters
-    total_elevation_loss: float  # meters
-    estimated_time: float  # hours
-    difficulty: TrailDifficulty
-    overnight_stop: Optional[Node] = None  # hut or campsite
-
-
-@dataclass
-class MultiDayPlan:
-    """A multi-day hiking plan."""
-    route: Route
-    days: List[DayPlan]
-    total_days: int
-    overnight_stops: List[Node]
 
 
 @dataclass

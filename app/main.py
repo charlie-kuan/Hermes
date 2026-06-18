@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from app import __version__
-from app.api.routes import areas, health, routes
+from app.api.routes import admin, areas, health, routes
 from app.config import settings
 from app.exceptions import (
     GraphNotFoundError,
@@ -105,6 +105,7 @@ async def shutdown_event():
 app.include_router(health.router, prefix="")
 app.include_router(areas.router, prefix="/api/v1")
 app.include_router(routes.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 
 
 # Root endpoint

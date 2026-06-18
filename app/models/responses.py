@@ -46,7 +46,7 @@ class NodeResponse(BaseModel):
     type: str
     lat: float
     lon: float
-    elevation: float
+    elevation: Optional[float] = 0.0
     name: Optional[str] = None
     amenities: List[str] = Field(default_factory=list)
 
@@ -70,19 +70,6 @@ class TimeEstimate(BaseModel):
     normal: float = Field(..., description="Normal estimate in hours")
     conservative: float = Field(..., description="Conservative estimate in hours")
 
-
-class DayPlanResponse(BaseModel):
-    """Single day plan in a multi-day route."""
-    day_number: int
-    segments: List[RouteSegmentResponse]
-    start_node: NodeResponse
-    end_node: NodeResponse
-    total_distance: float
-    total_elevation_gain: float
-    total_elevation_loss: float
-    estimated_time: float
-    difficulty: str
-    overnight_stop: Optional[NodeResponse] = None
 
 
 class EquipmentRecommendationResponse(BaseModel):
@@ -112,12 +99,6 @@ class RouteResponse(BaseModel):
     difficulty: str
     is_loop: bool
     waypoints: List[NodeResponse] = Field(default_factory=list)
-
-    # Multi-day planning
-    multi_day: bool = False
-    days: Optional[List[DayPlanResponse]] = None
-    total_days: Optional[int] = None
-    overnight_stops: Optional[List[NodeResponse]] = None
 
     # Recommendations
     equipment: List[EquipmentRecommendationResponse] = Field(default_factory=list)

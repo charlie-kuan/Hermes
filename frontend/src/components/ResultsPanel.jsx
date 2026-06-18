@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { apiService } from '../services/api';
 import ElevationProfile from './ElevationProfile';
 
 export default function ResultsPanel({ route, onExport }) {
+  const [collapsed, setCollapsed] = useState({ time: true, equipment: true, food: true });
+  const toggle = (key) => setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
   if (!route) {
     return (
       <div className="results-panel">
@@ -81,55 +84,34 @@ export default function ResultsPanel({ route, onExport }) {
 
       {/* Time Estimates */}
       <div className="result-section">
-        <h3>⏱️ 時間估算</h3>
-        <div className="time-estimates">
-          <div className="time-item">
-            <span className="time-label">樂觀:</span>
-            <span className="time-value">{formatTime(route.estimated_time.optimistic)}</span>
-          </div>
-          <div className="time-item time-normal">
-            <span className="time-label">正常:</span>
-            <span className="time-value">{formatTime(route.estimated_time.normal)}</span>
-          </div>
-          <div className="time-item">
-            <span className="time-label">保守:</span>
-            <span className="time-value">{formatTime(route.estimated_time.conservative)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Multi-day Plan */}
-      {route.multi_day && route.days && (
-        <div className="result-section">
-          <h3>📅 多日規劃 ({route.total_days} 天)</h3>
-          {route.days.map((day, index) => (
-            <div key={index} className="day-plan">
-              <h4>Day {day.day_number}</h4>
-              <div className="day-stats">
-                <div>距離: {day.total_distance.toFixed(1)} km</div>
-                <div>時間: {formatTime(day.estimated_time)}</div>
-                <div>爬升: {day.total_elevation_gain.toFixed(0)} m</div>
-              </div>
-              {day.overnight_stop && (
-                <div className="overnight-stop">
-                  <strong>過夜點:</strong> {day.overnight_stop.name || day.overnight_stop.type}
-                  {day.overnight_stop.amenities?.length > 0 && (
-                    <div className="amenities">
-                      設施: {day.overnight_stop.amenities.join(', ')}
-                    </div>
-                  )}
-                </div>
-              )}
+        <h3 className="collapsible-header" onClick={() => toggle('time')}>
+          ⏱️ 時間估算 <span className="collapse-icon">{collapsed.time ? '▶' : '▼'}</span>
+        </h3>
+        {!collapsed.time && (
+          <div className="time-estimates">
+            <div className="time-item">
+              <span className="time-label">樂觀:</span>
+              <span className="time-value">{formatTime(route.estimated_time.optimistic)}</span>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="time-item time-normal">
+              <span className="time-label">正常:</span>
+              <span className="time-value">{formatTime(route.estimated_time.normal)}</span>
+            </div>
+            <div className="time-item">
+              <span className="time-label">保守:</span>
+              <span className="time-value">{formatTime(route.estimated_time.conservative)}</span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Equipment */}
       {route.equipment && route.equipment.length > 0 && (
         <div className="result-section">
-          <h3>🎒 裝備建議</h3>
-          {route.equipment.map((category, index) => (
+          <h3 className="collapsible-header" onClick={() => toggle('equipment')}>
+            🎒 裝備建議 <span className="collapse-icon">{collapsed.equipment ? '▶' : '▼'}</span>
+          </h3>
+          {!collapsed.equipment && route.equipment.map((category, index) => (
             <div key={index} className="equipment-category">
               <h4>{category.category === 'essential' ? '必備裝備' :
                    category.category === 'overnight' ? '過夜裝備' :
@@ -148,22 +130,28 @@ export default function ResultsPanel({ route, onExport }) {
       {/* Food */}
       {route.food && (
         <div className="result-section">
-          <h3>🍽️ 食物與水</h3>
-          <div className="food-info">
-            <div>每日熱量: {route.food.daily_calories} kcal</div>
-            <div>總熱量: {route.food.total_calories} kcal</div>
-            <div>每日水量: {route.food.daily_water_liters} L</div>
-            <div>每日餐數: {route.food.meals_per_day}</div>
-          </div>
-          {route.food.notes && route.food.notes.length > 0 && (
-            <div className="food-notes">
-              <strong>注意事項:</strong>
-              <ul>
-                {route.food.notes.map((note, i) => (
-                  <li key={i}>{note}</li>
-                ))}
-              </ul>
-            </div>
+          <h3 className="collapsible-header" onClick={() => toggle('food')}>
+            🍽️ 食物與水 <span className="collapse-icon">{collapsed.food ? '▶' : '▼'}</span>
+          </h3>
+          {!collapsed.food && (
+            <>
+              <div className="food-info">
+                <div>每日熱量: {route.food.daily_calories} kcal</div>
+                <div>總熱量: {route.food.total_calories} kcal</div>
+                <div>每日水量: {route.food.daily_water_liters} L</div>
+                <div>每日餐數: {route.food.meals_per_day}</div>
+              </div>
+              {route.food.notes && route.food.notes.length > 0 && (
+                <div className="food-notes">
+                  <strong>注意事項:</strong>
+                  <ul>
+                    {route.food.notes.map((note, i) => (
+                      <li key={i}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -1,0 +1,104 @@
+{
+  "areas": [
+    {
+      "area_id": "yushan",
+      "name": "玉山群峰",
+      "description": "包含台灣第一高峰玉山主峰、玉山前峰、東峰、北峰、西峰等群峰，及八通關古道"
+    },
+    {
+      "area_id": "nanhu",
+      "name": "北一段",
+      "description": "中央山脈北一段，包含南湖大山主峰、東峰、北峰及中央尖山等"
+    },
+    {
+      "area_id": "junda_xiluan",
+      "name": "郡大山、西巒大山",
+      "description": ""
+    },
+    {
+      "area_id": "sacred_ridge",
+      "name": "聖稜縱走",
+      "description": "包含大壩群峰、武稜四秀、雪東線"
+    },
+    {
+      "area_id": "xueshan_southwest_ridge",
+      "name": "雪山西南稜縱走",
+      "description": "志佳陽線、大劍線、大雪線"
+    },
+    {
+      "area_id": "baigu",
+      "name": "白姑大山",
+      "description": "白姑大山單登"
+    },
+    {
+      "area_id": "nenggao_traverse",
+      "name": "能高越嶺",
+      "description": "能高、奇萊主南峰、南華山"
+    },
+    {
+      "area_id": "nenggao_andongjun",
+      "name": "能高安東軍縱走",
+      "description": "能高安東軍縱走"
+    },
+    {
+      "area_id": "ganzhuowan",
+      "name": "干卓萬群峰縱走",
+      "description": "干卓萬群峰縱走"
+    },
+    {
+      "area_id": "qicai_liushun",
+      "name": "七彩六順",
+      "description": "七彩湖、六順山"
+    },
+    {
+      "area_id": "danda_dongjun_traverse",
+      "name": "丹大東郡橫斷縱走",
+      "description": "丹大山列、東郡山彙"
+    },
+    {
+      "area_id": "south_second_section",
+      "name": "南二段",
+      "description": "嘉明湖、關山嶺山、塔關山"
+    },
+    {
+      "area_id": "sinkang_traverse",
+      "name": "新康橫斷縱走",
+      "description": "新康、八通關古道東段、嘉明湖"
+    },
+    {
+      "area_id": "south_first_section",
+      "name": "南一段",
+      "description": "塔關山、南一段"
+    },
+    {
+      "area_id": "beidawu",
+      "name": "北大武山",
+      "description": "北大武山"
+    },
+    {
+      "area_id": "qilai",
+      "name": "合歡奇萊縱走",
+      "description": "奇萊北峰、奇萊主山，與合歡群峰隔山谷對望，合稱「北三段」"
+    },
+    {
+      "area_id": "taroko",
+      "name": "太魯閣山列",
+      "description": "奇萊東稜縱走"
+    },
+    {
+      "area_id": "north_second_section",
+      "name": "北二段",
+      "description": "包含閂山、鈴鳴山、甘薯峰與無明山、畢祿羊頭"
+    },
+    {
+      "area_id": "mabolasi",
+      "name": "馬博拉斯橫斷",
+      "description": "中央山脈核心地帶，包含秀姑巒山、馬博拉斯山"
+    },
+    {
+      "area_id": "south_third_section",
+      "name": "南三段（丹大東郡）",
+      "description": "被譽為「台版聖母峰」或「終極縱走」，地處深山、路程遙遠且地形複雜"
+    }
+  ]
+}

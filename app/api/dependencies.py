@@ -5,7 +5,6 @@ from functools import lru_cache
 from app.services.estimation_service import EstimationService
 from app.services.export_service import ExportService
 from app.services.graph_service import GraphService
-from app.services.planning_service import PlanningService
 from app.services.recommendation_service import RecommendationService
 from app.services.routing_service import RoutingService
 
@@ -26,12 +25,6 @@ def get_routing_service() -> RoutingService:
 def get_estimation_service() -> EstimationService:
     """Get or create EstimationService instance."""
     return EstimationService()
-
-
-@lru_cache()
-def get_planning_service() -> PlanningService:
-    """Get or create PlanningService instance."""
-    return PlanningService(get_graph_service(), get_estimation_service())
 
 
 @lru_cache()

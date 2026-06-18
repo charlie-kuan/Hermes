@@ -68,11 +68,15 @@ class PlanningService:
                 f"This might indicate a unit conversion issue."
             )
 
-        # Split into days
+        # Split into days.
+        # Rule: a day can only end at an actual overnight node (hut/campsite)
+        # that exists on the route, never at an arbitrary segment boundary.
         days = []
         current_day_segments = []
         cumulative_time = 0.0
         day_number = 1
+        split_threshold = target_hours_per_day * 0.8
+        pending_split = False
 
         for i, segment in enumerate(route.segments):
             # Validate segment time before using it
@@ -111,39 +115,51 @@ class PlanningService:
                 f"cumulative={cumulative_time:.2f}h"
             )
 
-            # Check if we should end the day
+            # Check if we should end the day.
+            # We only split when the current route node itself is a valid overnight point.
             is_last_segment = (i == len(route.segments) - 1)
-            should_split = (
-                cumulative_time >= target_hours_per_day * 0.8 and  # At least 80% of target
-                not is_last_segment
-            )
-            
-            if should_split:
+            end_node = segment.end_node
+            end_node_is_overnight = end_node.node_type in [NodeType.HUT, NodeType.CAMPSITE]
+
+            if cumulative_time >= split_threshold and not is_last_segment:
+                pending_split = True
+
+            should_split_here = pending_split and end_node_is_overnight and not is_last_segment
+
+            if should_split_here:
                 logger.info(
-                    f"Splitting day at segment {i+1}: "
-                    f"cumulative_time={cumulative_time:.2f}h >= "
-                    f"threshold={target_hours_per_day * 0.8:.2f}h"
+                    f"Splitting day at overnight node {end_node.name or end_node.id}: "
+                    f"cumulative_time={cumulative_time:.2f}h >= threshold={split_threshold:.2f}h"
                 )
 
-            if should_split or is_last_segment:
-                # Find overnight stop
-                end_node = segment.end_node
-                overnight_node = None
-
-                if not is_last_segment:
-                    # Find accommodation near current position
-                    overnight_node = self._find_overnight_stop(
-                        graph, end_node, prefer_huts
-                    )
-
-                # Create day plan
                 day = self._create_day_plan(
                     day_number,
                     current_day_segments,
-                    overnight_node
+                    end_node
                 )
                 days.append(day)
-                
+
+                logger.info(
+                    f"Created Day {day_number}: "
+                    f"{len(current_day_segments)} segments, "
+                    f"{day.total_distance:.1f}km, "
+                    f"{day.estimated_time:.2f}h, "
+                    f"overnight={end_node.name or end_node.id}"
+                )
+
+                current_day_segments = []
+                cumulative_time = 0.0
+                pending_split = False
+                day_number += 1
+
+            elif is_last_segment:
+                day = self._create_day_plan(
+                    day_number,
+                    current_day_segments,
+                    None
+                )
+                days.append(day)
+
                 logger.info(
                     f"Created Day {day_number}: "
                     f"{len(current_day_segments)} segments, "
@@ -151,18 +167,15 @@ class PlanningService:
                     f"{day.estimated_time:.2f}h"
                 )
 
-                # Reset for next day
-                current_day_segments = []
-                cumulative_time = 0.0
-                day_number += 1
-
         # Collect overnight stops
         overnight_stops = [day.overnight_stop for day in days if day.overnight_stop]
+
+        total_days = max(1, len(overnight_stops) + 1)
 
         multi_day_plan = MultiDayPlan(
             route=route,
             days=days,
-            total_days=len(days),
+            total_days=total_days,
             overnight_stops=overnight_stops
         )
 

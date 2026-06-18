@@ -240,44 +240,93 @@ export default function Map3D({
       });
     }
 
-    // Add waypoint markers
-    if (route.waypoints && route.waypoints.length > 0) {
-      route.waypoints.forEach((waypoint, index) => {
-        const color = waypoint.type === 'peak' ? '#f97316' :
-                     waypoint.type === 'hut' ? '#8b5cf6' : '#eab308';
-        const icon = waypoint.type === 'peak' ? '⛰️' :
-                    waypoint.type === 'hut' ? '🏠' : '📍';
-
-        const el = document.createElement('div');
-        el.style.cssText = `
-          background-color: ${color};
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          cursor: pointer;
-        `;
-        el.textContent = icon;
-
-        const marker = new maplibregl.Marker({ element: el })
-          .setLngLat([waypoint.lon, waypoint.lat])
-          .setPopup(new maplibregl.Popup({ offset: 25 })
-            .setHTML(`
-              <strong>${waypoint.name || waypoint.type}</strong><br/>
-              類型: ${waypoint.type}<br/>
-              海拔: ${waypoint.elevation?.toFixed(0)}m
-              ${waypoint.amenities?.length > 0 ? `<br/>設施: ${waypoint.amenities.join(', ')}` : ''}
-            `))
-          .addTo(map.current);
-
-        markersRef.current.push(marker);
+    // Collect all unique segment nodes
+    const seenIds = new Set();
+    const allNodes = [];
+    if (route.segments && route.segments.length > 0) {
+      route.segments.forEach((seg, i) => {
+        if (!seenIds.has(seg.start_node.id)) {
+          seenIds.add(seg.start_node.id);
+          allNodes.push({ node: seg.start_node, role: i === 0 ? 'start' : 'middle' });
+        }
+        if (i === route.segments.length - 1) {
+          if (!seenIds.has(seg.end_node.id)) {
+            seenIds.add(seg.end_node.id);
+            allNodes.push({ node: seg.end_node, role: 'end' });
+          }
+        }
       });
     }
+
+    const typeIcon = (type) => {
+      switch (type) {
+        case 'peak': return '⛰️';
+        case 'hut': return '🏠';
+        case 'campsite': return '⛺';
+        case 'trailhead': return '🚩';
+        default: return '📍';
+      }
+    };
+    const typeLabel = (type) => {
+      switch (type) {
+        case 'peak': return '山頂';
+        case 'hut': return '山屋';
+        case 'campsite': return '營地';
+        case 'trailhead': return '登山口';
+        case 'intersection': return '岔路';
+        default: return '節點';
+      }
+    };
+
+    const significantTypes = new Set(['peak', 'hut', 'campsite', 'trailhead']);
+
+    allNodes.forEach(({ node, role }) => {
+      const isEndpoint = role === 'start' || role === 'end';
+      if (!isEndpoint && !significantTypes.has(node.type)) return;
+
+      const color = role === 'start' ? '#10b981' :
+                    role === 'end' ? '#ef4444' :
+                    node.type === 'peak' ? '#f97316' :
+                    node.type === 'hut' ? '#8b5cf6' :
+                    node.type === 'campsite' ? '#06b6d4' :
+                    '#64748b';
+
+      const size = isEndpoint ? 34 : 26;
+      const icon = isEndpoint
+        ? (role === 'start' ? '🚩' : '🏁')
+        : typeIcon(node.type);
+
+      const el = document.createElement('div');
+      el.style.cssText = `
+        background-color: ${color};
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: ${isEndpoint ? 16 : 13}px;
+        cursor: pointer;
+        z-index: ${isEndpoint ? 10 : 5};
+      `;
+      el.textContent = icon;
+
+      const label = role === 'start' ? '起點' : role === 'end' ? '終點' : typeLabel(node.type);
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([node.lon, node.lat])
+        .setPopup(new maplibregl.Popup({ offset: 25 })
+          .setHTML(`
+            <strong>${node.name || label}</strong><br/>
+            ${label}<br/>
+            海拔: ${node.elevation?.toFixed(0)}m
+            ${node.amenities?.length > 0 ? `<br/>設施: ${node.amenities.join(', ')}` : ''}
+          `))
+        .addTo(map.current);
+
+      markersRef.current.push(marker);
+    });
   }, [route, isMapLoaded]);
 
   // Handle preview waypoints
