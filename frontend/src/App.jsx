@@ -19,6 +19,7 @@ function App() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wideMode, setWideMode] = useState(false);
+  const [selectedLegIndex, setSelectedLegIndex] = useState(null);
   const isAdminRoute = window.location.pathname === '/admin';
   const [adminOpen, setAdminOpen] = useState(isAdminRoute);
   const [theme, setTheme] = useState('light');
@@ -95,11 +96,12 @@ function App() {
   const handleClearRoute = () => {
     setRoute(null);
     setSelectedPoints([]);
+    setSelectedLegIndex(null);
   };
 
-  // Goes back to form but keeps area + points so user can tweak and re-plan
   const handleReplan = () => {
     setRoute(null);
+    setSelectedLegIndex(null);
   };
 
   const handlePlanRoute = async (params) => {
@@ -155,6 +157,7 @@ function App() {
           availablePoints={selectedArea?.points || []}
           selectedPoints={selectedPoints}
           onPointClick={handlePointAdd}
+          selectedLegIndex={selectedLegIndex}
         />
       </div>
 
@@ -164,13 +167,6 @@ function App() {
           <span className="sidebar-header-title">
             {route ? '📊 路線資訊' : '📍 路線規劃'}
           </span>
-          <button
-            className={`btn-wide-toggle ${wideMode ? 'active' : ''}`}
-            onClick={() => setWideMode(w => !w)}
-            title={wideMode ? '收合成單欄' : '展開成雙欄'}
-          >
-            {wideMode ? '⊟' : '⊞'}
-          </button>
         </div>
         <div className="sidebar-content">
           {!route ? (
@@ -194,19 +190,32 @@ function App() {
               onReplan={handleReplan}
               onClearRoute={handleClearRoute}
               wideMode={wideMode}
+              selectedLegIndex={selectedLegIndex}
+              onLegSelect={i => setSelectedLegIndex(prev => prev === i ? null : i)}
             />
           )}
         </div>
       </aside>
 
-      {/* Sidebar Toggle */}
-      <button
-        className={`sidebar-toggle ${sidebarOpen ? 'sidebar-open' : ''} ${!route && wideMode ? 'wide' : ''}`}
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        title={sidebarOpen ? '收起側欄' : '展開側欄'}
-      >
-        {sidebarOpen ? '◀' : '▶'}
-      </button>
+      {/* Sidebar controls — toggle + wide mode */}
+      <div className={`sidebar-controls ${sidebarOpen ? 'sidebar-open' : ''} ${wideMode ? 'wide' : ''}`}>
+        <button
+          className="sidebar-ctrl-btn"
+          onClick={() => setSidebarOpen(o => !o)}
+          title={sidebarOpen ? '收起側欄' : '展開側欄'}
+        >
+          {sidebarOpen ? '◀' : '▶'} {sidebarOpen ? '收起' : '展開'}
+        </button>
+        {sidebarOpen && (
+          <button
+            className={`sidebar-ctrl-btn${wideMode ? ' active' : ''}`}
+            onClick={() => setWideMode(w => !w)}
+            title={wideMode ? '單欄顯示' : '雙欄顯示'}
+          >
+            {wideMode ? '⊟' : '⊞'} {wideMode ? '單欄' : '雙欄'}
+          </button>
+        )}
+      </div>
 
 
       {loading && (

@@ -15,6 +15,7 @@ from app.exceptions import (
     NoValidPathError,
     RouteNotFoundError
 )
+from app.utils.dem_downloader import ensure_dem_exists
 from app.utils.logger import setup_logging
 
 # Setup logging
@@ -92,6 +93,8 @@ async def startup_event():
     logger.info(f"Starting {settings.app_name} v{__version__}")
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"Data directory: {settings.data_dir}")
+    if settings.use_local_dem:
+        await ensure_dem_exists(settings.local_dem_dir)
 
 
 # Shutdown event

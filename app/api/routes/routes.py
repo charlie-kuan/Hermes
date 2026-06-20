@@ -141,6 +141,7 @@ def _build_legs(segments: list, split_node_ids: list, name_by_node_id: dict = No
     split_set = set(split_node_ids)
     legs = []
     current = []
+    seg_start = 0
 
     def _named(node):
         r = node_to_response(node)
@@ -148,7 +149,7 @@ def _build_legs(segments: list, split_node_ids: list, name_by_node_id: dict = No
             r.name = name_by_node_id[node.id]
         return r
 
-    for seg in segments:
+    for idx, seg in enumerate(segments):
         current.append(seg)
         if seg.end_node.id in split_set or seg is segments[-1]:
             dist = sum(s.distance for s in current)
@@ -162,7 +163,10 @@ def _build_legs(segments: list, split_node_ids: list, name_by_node_id: dict = No
                 elevation_gain=gain,
                 elevation_loss=loss,
                 estimated_time=time,
+                segment_start=seg_start,
+                segment_end=idx,
             ))
+            seg_start = idx + 1
             current = []
     return legs
 

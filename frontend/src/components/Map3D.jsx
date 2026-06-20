@@ -10,6 +10,7 @@ export default function Map3D({
   availablePoints = [],
   selectedPoints = [],
   onPointClick,
+  selectedLegIndex = null,
 }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -269,6 +270,59 @@ export default function Map3D({
 
   }, [route, isMapLoaded]);
 
+  // ── Highlight selected leg ──
+  useEffect(() => {
+    if (!map.current || !isMapLoaded || !route) return;
+
+    const leg = selectedLegIndex !== null ? route.legs?.[selectedLegIndex] : null;
+
+    if (leg) {
+      // Highlight coords from the leg's segment range
+      const legSegs = route.segments.slice(leg.segment_start, leg.segment_end + 1);
+      const highlightCoords = legSegs.flatMap(seg => {
+        if (seg.geometry?.length > 0) return seg.geometry.map(p => [p[1] || p.lon, p[0] || p.lat]);
+        return [[seg.start_node.lon, seg.start_node.lat]];
+      });
+
+      // Dim full route
+      if (map.current.getLayer('route')) map.current.setPaintProperty('route', 'line-opacity', 0.2);
+      if (map.current.getLayer('route-outline')) map.current.setPaintProperty('route-outline', 'line-opacity', 0.15);
+
+      // Add or update highlight layer
+      const hlGeoJSON = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: highlightCoords } };
+      if (map.current.getSource('route-highlight')) {
+        map.current.getSource('route-highlight').setData(hlGeoJSON);
+      } else {
+        map.current.addSource('route-highlight', { type: 'geojson', data: hlGeoJSON });
+        map.current.addLayer({ id: 'route-highlight-outline', type: 'line', source: 'route-highlight',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.8 },
+        });
+        map.current.addLayer({ id: 'route-highlight', type: 'line', source: 'route-highlight',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#f59e0b', 'line-width': 5, 'line-opacity': 1 },
+        });
+      }
+
+      // FlyTo leg bounds
+      if (highlightCoords.length > 0) {
+        const bounds = highlightCoords.reduce((b, c) => b.extend(c),
+          new maplibregl.LngLatBounds(highlightCoords[0], highlightCoords[0]));
+        map.current.fitBounds(bounds, { padding: 160, duration: 800, maxZoom: 13 });
+      }
+    } else {
+      // Restore full route opacity
+      if (map.current.getLayer('route')) map.current.setPaintProperty('route', 'line-opacity', 0.95);
+      if (map.current.getLayer('route-outline')) map.current.setPaintProperty('route-outline', 'line-opacity', 0.7);
+
+      // Remove highlight layers
+      ['route-highlight', 'route-highlight-outline'].forEach(id => {
+        if (map.current.getLayer(id)) map.current.removeLayer(id);
+      });
+      if (map.current.getSource('route-highlight')) map.current.removeSource('route-highlight');
+    }
+  }, [selectedLegIndex, route, isMapLoaded]);
+
   const toggle3D = () => {
     if (!map.current) return;
     map.current.easeTo({ pitch: is3DMode ? 0 : 60, bearing: 0, duration: 800 });
@@ -293,32 +347,15 @@ export default function Map3D({
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
       <div ref={mapContainer} style={{ height: '100%', width: '100%' }} />
 
-      {/* Map controls — dark themed */}
-      <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 1000 }}>
+      {/* Map controls */}
+      <div className="map-controls">
         <button
+          className={`map-ctrl-btn map-ctrl-3d${is3DMode ? ' active' : ''}`}
           onClick={toggle3D}
-          style={{
-            ...ctrlBase,
-            width: 'auto',
-            background: is3DMode ? '#4ade80' : 'rgba(10,18,12,0.88)',
-            color: is3DMode ? '#0a120c' : '#f0fdf4',
-            border: '1px solid rgba(74,222,128,0.3)',
-            borderRadius: 8,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            fontWeight: 600,
-            padding: '8px 14px',
-          }}
         >
           {is3DMode ? '🗻 3D' : '🗺 2D'}
         </button>
-
-        <div style={{
-          background: 'rgba(10,18,12,0.88)',
-          border: '1px solid rgba(74,222,128,0.2)',
-          borderRadius: 8,
-          overflow: 'hidden',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-        }}>
+        <div className="map-ctrl-group">
           {[
             { key: 'osm', label: '🗺 標準地圖' },
             { key: 'terrain', label: '⛰️ 地形圖' },
@@ -326,14 +363,8 @@ export default function Map3D({
           ].map(({ key, label }, i) => (
             <button
               key={key}
+              className={`map-ctrl-style${mapStyle === key ? ' active' : ''}${i > 0 ? ' sep' : ''}`}
               onClick={() => switchMapStyle(key)}
-              style={{
-                ...ctrlBase,
-                borderTop: i > 0 ? '1px solid rgba(74,222,128,0.15)' : 'none',
-                background: mapStyle === key ? '#4ade80' : 'transparent',
-                color: mapStyle === key ? '#0a120c' : '#86efac',
-                fontWeight: mapStyle === key ? 700 : 400,
-              }}
             >
               {label}
             </button>

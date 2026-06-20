@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { apiService } from '../services/api';
 import ElevationProfile from './ElevationProfile';
 
-export default function ResultsPanel({ route, onReplan, onClearRoute, wideMode = false }) {
+export default function ResultsPanel({ route, onReplan, onClearRoute, wideMode = false, selectedLegIndex = null, onLegSelect }) {
   const [collapsed, setCollapsed] = useState({ stats: false, elevation: false, segments: false, dayplans: false, equipment: true, food: true });
   const toggle = (key) => setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -59,7 +59,11 @@ export default function ResultsPanel({ route, onReplan, onClearRoute, wideMode =
       {!collapsed.segments && (
         <div className="result-section-body">
           {route.legs.map((leg, i) => (
-            <div key={i} className="segment-row">
+            <div
+              key={i}
+              className={`segment-row${selectedLegIndex === i ? ' segment-row-active' : ''}`}
+              onClick={() => onLegSelect?.(i)}
+            >
               <div className="segment-nodes">
                 <span className="segment-node-name">{leg.start_node.name || leg.start_node.type}</span>
                 <span className="segment-arrow">→</span>

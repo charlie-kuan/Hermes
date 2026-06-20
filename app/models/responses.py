@@ -95,6 +95,8 @@ class LegResponse(BaseModel):
     elevation_gain: float
     elevation_loss: float
     estimated_time: float  # normal estimate in hours
+    segment_start: int  # index into route.segments (inclusive)
+    segment_end: int    # index into route.segments (inclusive)
 
 
 class DayPlanResponse(BaseModel):
