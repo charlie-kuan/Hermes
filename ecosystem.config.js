@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: "hermes-backend",
-      script: "/bin/bash",
-      args: "-c 'source /root/miniconda3/etc/profile.d/conda.sh 2>/dev/null || source /opt/miniconda3/etc/profile.d/conda.sh 2>/dev/null; conda activate Hermes; uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2'",
+      script: "/root/miniconda3/envs/Hermes/bin/uvicorn",
+      args: "app.main:app --host 0.0.0.0 --port 8000 --workers 2",
       cwd: "/root/Project/Hermes",
       interpreter: "none",
       autorestart: true,
