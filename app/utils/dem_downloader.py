@@ -43,10 +43,16 @@ def _download_with_resume(url: str, tmp_path: Path) -> None:
             with httpx.Client(timeout=3600, follow_redirects=True, headers=headers) as client:
                 with client.stream("GET", url) as resp:
                     if resp.status_code == 416:
-                        # Already fully downloaded
                         logger.info("File already fully downloaded.")
                         return
                     resp.raise_for_status()
+
+                    # If server ignores Range and returns 200, start over
+                    if downloaded > 0 and resp.status_code == 200:
+                        logger.warning("Server does not support resume, restarting download...")
+                        downloaded = 0
+                        tmp_path.unlink(missing_ok=True)
+
                     total = int(resp.headers.get("content-length", 0))
                     if total:
                         full_size = downloaded + total
