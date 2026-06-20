@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: "hermes-backend",
-      script: ".venv/bin/uvicorn",
-      args: "app.main:app --host 0.0.0.0 --port 8000 --workers 2",
+      script: "/root/miniconda3/bin/conda",
+      args: "run -n Hermes uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2",
       cwd: "/root/Project/Hermes",
       interpreter: "none",
       autorestart: true,
@@ -17,8 +17,8 @@ module.exports = {
     },
     {
       name: "hermes-frontend",
-      script: "serve",                  // npm install -g serve
-      args: "-s dist -l 3000",
+      script: "serve",
+      args: "-s dist -l 4000 --single",
       cwd: "/root/Project/Hermes/frontend",
       interpreter: "none",
       autorestart: true,
