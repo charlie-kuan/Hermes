@@ -2,9 +2,9 @@ module.exports = {
   apps: [
     {
       name: "hermes-backend",
-      script: "/opt/miniconda3/bin/conda",
-      args: "run -n Hermes uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2",
-      cwd: "/path/to/Project_Hermes",   // ← 改成 server 上的實際路徑
+      script: ".venv/bin/uvicorn",
+      args: "app.main:app --host 0.0.0.0 --port 8000 --workers 2",
+      cwd: "/root/Project/Hermes",
       interpreter: "none",
       autorestart: true,
       watch: false,
@@ -19,7 +19,7 @@ module.exports = {
       name: "hermes-frontend",
       script: "serve",                  // npm install -g serve
       args: "-s dist -l 3000",
-      cwd: "/path/to/Project_Hermes/frontend",  // ← 改成實際路徑
+      cwd: "/root/Project/Hermes/frontend",
       interpreter: "none",
       autorestart: true,
       watch: false
