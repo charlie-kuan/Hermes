@@ -74,6 +74,63 @@ def _resolve_node_id(
     )
 
 
+def _resolve_node_with_distance(
+    graph_service: GraphService,
+    graph,
+    lat: float,
+    lon: float,
+    nearest_max_distance: float = 2000.0,
+    edge_snap_max_distance: float = 3000.0
+) -> tuple[Optional[str], float]:
+    """Resolve a coordinate and return (node_id, snap_distance_metres)."""
+    node_id, dist = graph_service.find_nearest_node_with_distance(
+        graph, lat, lon, max_distance=nearest_max_distance
+    )
+    if node_id:
+        return node_id, dist
+
+    node_id = graph_service.find_or_create_node_at_point(
+        graph,
+        lat,
+        lon,
+        max_distance=edge_snap_max_distance,
+        split_edges=True
+    )
+    return node_id, dist  # dist here is the nearest-node dist (proxy for how far we snapped)
+
+
+_GRAPH_EXPANSION_SNAP_THRESHOLD_M = 300.0
+
+
+def _expand_bbox_for_coords(
+    area_data: Optional[dict],
+    extra_coords: list[tuple[float, float]],
+    buffer_km: float = 2.0
+) -> list[float]:
+    """Build a bbox covering area_data routes + any extra coordinates."""
+    from app.utils.geo_utils import calculate_bbox_from_area_data
+
+    lats = [lat for lat, _ in extra_coords]
+    lons = [lon for _, lon in extra_coords]
+
+    if area_data:
+        try:
+            base = calculate_bbox_from_area_data(area_data, buffer_km=buffer_km)
+            # Union with extra coords
+            lats += [base[0], base[2]]
+            lons += [base[1], base[3]]
+        except ValueError:
+            pass
+
+    buffer_deg = buffer_km / 111.0
+    return [
+        min(lats) - buffer_deg,
+        min(lons) - buffer_deg,
+        max(lats) + buffer_deg,
+        max(lons) + buffer_deg,
+    ]
+
+
 def _build_retry_bbox(
     start_lat: float,
     start_lon: float,
@@ -184,7 +241,10 @@ def _build_day_plans(
     if not overnight_node_ids:
         return []
 
-    stop_set = set(overnight_node_ids)
+    # Use an ordered queue so each overnight stop is consumed exactly once,
+    # preventing duplicate day-breaks when the route passes the same node twice
+    # (e.g. a lodge visited on the way up and again on the way back).
+    remaining_stops = list(overnight_node_ids)
     night_by_node_id = night_by_node_id or {}
     name_override_by_node_id = name_override_by_node_id or {}
     days = []
@@ -193,8 +253,12 @@ def _build_day_plans(
 
     for seg in segments:
         current_segs.append(seg)
-        if seg.end_node.id in stop_set or seg is segments[-1]:
-            stop_node = seg.end_node if seg.end_node.id in stop_set else None
+        next_stop = remaining_stops[0] if remaining_stops else None
+        is_stop = next_stop is not None and seg.end_node.id == next_stop
+        if is_stop:
+            remaining_stops.pop(0)
+        if is_stop or seg is segments[-1]:
+            stop_node = seg.end_node if is_stop else None
             dist = sum(s.distance for s in current_segs)
             gain = sum(s.elevation_gain for s in current_segs)
             loss = sum(s.elevation_loss for s in current_segs)
@@ -264,103 +328,116 @@ async def plan_route(
     try:
         # Get or build graph - bbox will be auto-calculated from routes
         graph = graph_service.get_or_build_graph(
-            request.area_id, 
+            request.area_id,
             area_data=area_data
         )
 
-        # Find start node
-        start_node_id = _resolve_node_id(
-            graph_service,
-            graph,
-            request.start_lat,
-            request.start_lon,
-            nearest_max_distance=2000.0,
-            edge_snap_max_distance=3000.0
-        )
+        def _resolve_all_nodes(g):
+            """Resolve start, end, via, overnight nodes against graph g.
+            Returns a dict with all resolved IDs and snap distances."""
+            s_id, s_snap = _resolve_node_with_distance(
+                graph_service, g, request.start_lat, request.start_lon,
+            )
 
-        # Retry path: stale/too-small cached graph can miss nearby trails
-        if not start_node_id:
+            e_id, e_snap = None, 0.0
+            if not request.loop_route and request.end_lat and request.end_lon:
+                e_id, e_snap = _resolve_node_with_distance(
+                    graph_service, g, request.end_lat, request.end_lon,
+                )
+
+            via_raw = []  # [(node_id, snap_m, lat, lon, name)]
+            if request.via_points:
+                for vp in request.via_points:
+                    v_lat, v_lon = vp.get('lat'), vp.get('lon')
+                    if v_lat and v_lon:
+                        v_id, v_snap = _resolve_node_with_distance(
+                            graph_service, g, v_lat, v_lon,
+                        )
+                        via_raw.append((v_id, v_snap, v_lat, v_lon, vp.get('name')))
+
+            ons = []  # overnight stops — snap distance not critical
+            n_by_id: dict = {}
+            name_ov: dict = {}
+            if request.overnight_stops:
+                for stop in request.overnight_stops:
+                    s_lat2, s_lon2 = stop.get('lat'), stop.get('lon')
+                    if s_lat2 and s_lon2:
+                        nid = graph_service.find_nearest_node(g, s_lat2, s_lon2)
+                        if nid:
+                            ons.append(nid)
+                            if stop.get('night'):
+                                n_by_id[nid] = stop['night']
+                            if stop.get('name'):
+                                name_ov[nid] = stop['name']
+
+            return {
+                'start_id': s_id, 'start_snap': s_snap,
+                'end_id': e_id, 'end_snap': e_snap,
+                'via_raw': via_raw,
+                'overnight_ids': ons,
+                'night_by_node_id': n_by_id,
+                'name_override_by_node_id': name_ov,
+            }
+
+        # ── Phase 1: resolve everything against the current (possibly cached) graph ──
+        resolved = _resolve_all_nodes(graph)
+
+        # ── Phase 2: detect coverage gaps and rebuild if needed ──────────────
+        #
+        # A snap distance > threshold means the cached graph's bbox didn't reach
+        # that coordinate.  Collect all such coordinates and rebuild once with an
+        # expanded bbox that explicitly covers them.
+        out_of_coverage: list[tuple[float, float]] = []
+
+        if not resolved['start_id'] or resolved['start_snap'] > _GRAPH_EXPANSION_SNAP_THRESHOLD_M:
+            out_of_coverage.append((request.start_lat, request.start_lon))
+
+        if not request.loop_route and request.end_lat and request.end_lon:
+            if not resolved['end_id'] or resolved['end_snap'] > _GRAPH_EXPANSION_SNAP_THRESHOLD_M:
+                out_of_coverage.append((request.end_lat, request.end_lon))
+
+        for v_id, v_snap, v_lat, v_lon, _ in resolved['via_raw']:
+            if not v_id or v_snap > _GRAPH_EXPANSION_SNAP_THRESHOLD_M:
+                out_of_coverage.append((v_lat, v_lon))
+
+        if out_of_coverage:
+            snap_info = (
+                f"start={resolved['start_snap']:.0f}m, "
+                f"end={resolved['end_snap']:.0f}m, "
+                f"via=[{', '.join(f'{s:.0f}m' for _, s, *_ in resolved['via_raw'])}]"
+            )
             logger.warning(
-                f"Start node not found for {request.area_id}; rebuilding graph with expanded query bbox"
+                f"Graph coverage gap for {request.area_id} ({snap_info}). "
+                f"Rebuilding with expanded bbox covering {out_of_coverage}."
             )
-            retry_bbox = _build_retry_bbox(
-                request.start_lat,
-                request.start_lon,
-                request.end_lat,
-                request.end_lon,
-                padding_km=6.0
-            )
-
+            expanded_bbox = _expand_bbox_for_coords(area_data, out_of_coverage, buffer_km=2.0)
             graph_service.clear_cache(request.area_id)
             graph = graph_service.get_or_build_graph(
                 request.area_id,
-                bbox=retry_bbox,
-                area_data=area_data
+                bbox=expanded_bbox,
+                area_data=area_data,
             )
+            resolved = _resolve_all_nodes(graph)
 
-            start_node_id = _resolve_node_id(
-                graph_service,
-                graph,
-                request.start_lat,
-                request.start_lon,
-                nearest_max_distance=5000.0,
-                edge_snap_max_distance=5000.0
-            )
-
-        if not start_node_id:
+        # ── Phase 3: hard failure if still unresolved ────────────────────────
+        if not resolved['start_id']:
             raise HTTPException(
                 status_code=400,
-                  detail=f"No trail found within 2km of start coordinates ({request.start_lat:.5f}, {request.start_lon:.5f}) "
-                      f"(including 3km edge-snap fallback and 5km retry after graph rebuild). "
-                       f"Please select a location closer to the trail network."
+                detail=f"No trail found near start ({request.start_lat:.5f}, {request.start_lon:.5f}) "
+                       f"even after graph rebuild."
+            )
+        if not request.loop_route and request.end_lat and request.end_lon and not resolved['end_id']:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No trail found near end ({request.end_lat:.5f}, {request.end_lon:.5f}) "
+                       f"even after graph rebuild."
             )
 
-        # Find end node (if not loop)
-        end_node_id = None
-        if not request.loop_route and request.end_lat and request.end_lon:
-            end_node_id = _resolve_node_id(
-                graph_service,
-                graph,
-                request.end_lat,
-                request.end_lon,
-                nearest_max_distance=2000.0,
-                edge_snap_max_distance=3000.0
-            )
-
-            if not end_node_id:
-                end_node_id = _resolve_node_id(
-                    graph_service,
-                    graph,
-                    request.end_lat,
-                    request.end_lon,
-                    nearest_max_distance=5000.0,
-                    edge_snap_max_distance=5000.0
-                )
-
-            if not end_node_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"No trail found within 2km of end coordinates ({request.end_lat:.5f}, {request.end_lon:.5f}) "
-                              f"(including 3km edge-snap fallback and 5km retry after graph rebuild). "
-                           f"Please select a location closer to the trail network."
-                )
-
-        # Resolve overnight stop coordinates to node IDs
-        overnight_node_ids = []
-        night_by_node_id = {}
-        name_override_by_node_id = {}
-        if request.overnight_stops:
-            for stop in request.overnight_stops:
-                s_lat = stop.get('lat')
-                s_lon = stop.get('lon')
-                if s_lat and s_lon:
-                    nid = graph_service.find_nearest_node(graph, s_lat, s_lon)
-                    if nid:
-                        overnight_node_ids.append(nid)
-                        if stop.get('night'):
-                            night_by_node_id[nid] = stop['night']
-                        if stop.get('name'):
-                            name_override_by_node_id[nid] = stop['name']
+        start_node_id = resolved['start_id']
+        end_node_id = resolved['end_id']
+        overnight_node_ids = resolved['overnight_ids']
+        night_by_node_id = resolved['night_by_node_id']
+        name_override_by_node_id = resolved['name_override_by_node_id']
 
         # Build name map for user-selected points (to override "intersection" labels)
         name_by_node_id = {}
@@ -369,19 +446,15 @@ async def plan_route(
         if request.end_name and end_node_id:
             name_by_node_id[end_node_id] = request.end_name
 
-        # Convert via points to node IDs
+        # Convert via points to node IDs (already resolved; collect names)
         via_node_ids = None
-        if request.via_points:
+        if resolved['via_raw']:
             via_node_ids = []
-            for via_point in request.via_points:
-                via_lat = via_point.get('lat')
-                via_lon = via_point.get('lon')
-                if via_lat and via_lon:
-                    via_id = graph_service.find_nearest_node(graph, via_lat, via_lon)
-                    if via_id:
-                        via_node_ids.append(via_id)
-                        if via_point.get('name'):
-                            name_by_node_id[via_id] = via_point['name']
+            for v_id, _, _, _, v_name in resolved['via_raw']:
+                if v_id:
+                    via_node_ids.append(v_id)
+                    if v_name:
+                        name_by_node_id[v_id] = v_name
 
         # Plan the route
         route = routing_service.plan_route(

@@ -11,6 +11,8 @@ export default function Map3D({
   selectedPoints = [],
   onPointClick,
   selectedLegIndex = null,
+  sidebarOpen = true,
+  wideMode = false,
 }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -19,6 +21,13 @@ export default function Map3D({
   const areaMarkersRef = useRef([]);      // [{marker, el, pointId}]
   const areaMarkerMapRef = useRef({});    // pointId → {marker, el}
   const [is3DMode, setIs3DMode] = useState(false);
+
+  const sidebarPadding = (base) => ({
+    top: base,
+    bottom: base,
+    right: base,
+    left: base + (sidebarOpen ? (wideMode ? 560 : 420) : 0),
+  });
   const [mapStyle, setMapStyle] = useState('osm');
 
   const getMapStyle = (styleType) => {
@@ -115,7 +124,7 @@ export default function Map3D({
       (b, p) => b.extend([p.lon, p.lat]),
       new maplibregl.LngLatBounds([availablePoints[0].lon, availablePoints[0].lat], [availablePoints[0].lon, availablePoints[0].lat])
     );
-    map.current.fitBounds(bounds, { padding: 80, duration: 800, maxZoom: 14 });
+    map.current.fitBounds(bounds, { padding: sidebarPadding(80), duration: 800, maxZoom: 14 });
 
     availablePoints.forEach(point => {
       const icon = POINT_ICON[point.type] || '📍';
@@ -265,7 +274,7 @@ export default function Map3D({
 
       const bounds = coords.reduce((b, c) => b.extend(c),
         new maplibregl.LngLatBounds(coords[0], coords[0]));
-      map.current.fitBounds(bounds, { padding: 60, duration: 1000 });
+      map.current.fitBounds(bounds, { padding: sidebarPadding(60), duration: 1000 });
     }
 
   }, [route, isMapLoaded]);
@@ -308,7 +317,7 @@ export default function Map3D({
       if (highlightCoords.length > 0) {
         const bounds = highlightCoords.reduce((b, c) => b.extend(c),
           new maplibregl.LngLatBounds(highlightCoords[0], highlightCoords[0]));
-        map.current.fitBounds(bounds, { padding: 160, duration: 800, maxZoom: 13 });
+        map.current.fitBounds(bounds, { padding: sidebarPadding(60), duration: 800, maxZoom: 13 });
       }
     } else {
       // Restore full route opacity
@@ -321,7 +330,7 @@ export default function Map3D({
       });
       if (map.current.getSource('route-highlight')) map.current.removeSource('route-highlight');
     }
-  }, [selectedLegIndex, route, isMapLoaded]);
+  }, [selectedLegIndex, route, isMapLoaded, sidebarOpen, wideMode]);
 
   const toggle3D = () => {
     if (!map.current) return;

@@ -158,6 +158,8 @@ function App() {
           selectedPoints={selectedPoints}
           onPointClick={handlePointAdd}
           selectedLegIndex={selectedLegIndex}
+          sidebarOpen={sidebarOpen}
+          wideMode={wideMode}
         />
       </div>
 

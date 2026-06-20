@@ -202,6 +202,31 @@ class GraphService:
 
         return nearest
 
+    def find_nearest_node_with_distance(
+        self,
+        graph: nx.MultiDiGraph,
+        lat: float,
+        lon: float,
+        max_distance: float = 2000.0
+    ) -> tuple[Optional[str], float]:
+        """Like find_nearest_node but also returns the snap distance in metres."""
+        from app.utils.geo_utils import haversine_distance
+
+        min_dist = float('inf')
+        nearest = None
+
+        for node_id, data in graph.nodes(data=True):
+            node: Node = data['data']
+            dist = haversine_distance(lat, lon, node.lat, node.lon)
+            if dist < min_dist:
+                min_dist = dist
+                nearest = node_id
+
+        if min_dist > max_distance:
+            return None, min_dist
+
+        return nearest, min_dist
+
     def get_nodes_by_type(
         self,
         graph: nx.MultiDiGraph,

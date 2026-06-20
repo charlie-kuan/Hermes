@@ -256,7 +256,7 @@ export default function RouteForm({
           <div className="points-section route-form-col-scroll">{availablePointsBlock}</div>
         </div>
         <div className="route-form-col-sep" />
-        <div className="route-form-col">
+        <div className="route-form-col route-form-col-right">
           <div className="points-section">{selectedPointsBlock}</div>
           {fitnessBlock}
           {buttonsBlock}
