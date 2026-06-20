@@ -10,9 +10,9 @@ class TimeEstimator:
 
     # Base speeds (km/h) by fitness level
     BASE_SPEEDS = {
-        FitnessLevel.BEGINNER: 4.0,
-        FitnessLevel.MODERATE: 5.0,
-        FitnessLevel.EXPERT: 6.0,
+        FitnessLevel.BEGINNER: 3.0,
+        FitnessLevel.MODERATE: 4.0,
+        FitnessLevel.EXPERT: 5.0,
     }
 
     # Difficulty multipliers
@@ -34,7 +34,6 @@ class TimeEstimator:
         difficulty: TrailDifficulty,
         fitness: FitnessLevel,
         pack_weight_kg: float = 12.0,
-        apply_minimum: bool = True
     ) -> float:
         """
         Estimate hiking time using enhanced Naismith's Rule.
@@ -49,7 +48,6 @@ class TimeEstimator:
             difficulty: Trail difficulty
             fitness: Hiker fitness level
             pack_weight_kg: Pack weight in kg
-            apply_minimum: Whether to apply 30-minute minimum (for complete routes only)
 
         Returns:
             Estimated time in hours
@@ -58,14 +56,14 @@ class TimeEstimator:
         base_speed = self.BASE_SPEEDS[fitness]
         time_horizontal = distance_km / base_speed
 
-        # Time for ascent (Naismith: 1 hour per 600m)
-        time_ascent = elevation_gain_m / 600.0
+        # Time for ascent: 1 hour per 400m for alpine terrain
+        time_ascent = elevation_gain_m / 400.0
 
-        # Descent adjustment (subtract time, but capped at 25% of horizontal time)
-        # Rule: -10 minutes per 300m descent
+        # Descent adjustment (subtract time, but capped at 15% of horizontal time)
+        # Rule: -10 minutes per 500m descent
         time_descent_bonus = min(
-            elevation_loss_m / 300.0 / 6.0,  # Convert to hours
-            time_horizontal * 0.25
+            elevation_loss_m / 500.0 / 6.0,  # Convert to hours
+            time_horizontal * 0.15
         )
 
         # Apply difficulty factor
@@ -84,10 +82,7 @@ class TimeEstimator:
             total_time *= 1.1
 
         # Apply minimum only for complete routes, not individual segments
-        if apply_minimum:
-            return max(0.5, total_time)  # Minimum 30 minutes for complete routes
-        else:
-            return max(0.01, total_time)  # Minimum 36 seconds for segments
+        return total_time
 
     def estimate_with_scenarios(
         self,
@@ -154,7 +149,6 @@ class TimeEstimator:
         time = self.estimate_time(
             distance_km, elevation_gain_m, elevation_loss_m,
             difficulty, fitness, pack_weight_kg,
-            apply_minimum=False  # Don't force 30-minute minimum on segments
         )
 
         # Don't apply rest break multiplier to individual segments

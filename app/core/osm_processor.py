@@ -347,55 +347,27 @@ class OSMProcessor:
             source_node: Node = G.nodes[u]['data']
             target_node: Node = G.nodes[v]['data']
 
-            # If edge has detailed geometry, use it for more accurate elevation profile
-            if edge.geometry and len(edge.geometry) > 2:
-                try:
-                    # Get elevations for all points in the geometry
-                    elevations = []
-                    geometry_with_elevation = []
-
-                    for lat, lon in edge.geometry:
-                        elev = self.elevation_processor.get_elevation(lat, lon)
-                        if elev is not None:
-                            elevations.append(elev)
-                        else:
-                            # Fallback to interpolation if elevation not available
-                            elevations.append(None)
-
-                    # Interpolate missing elevations
-                    if elevations and any(e is not None for e in elevations):
-                        elevations = self.elevation_processor.interpolate_missing_elevations(elevations)
-
-                        # Update geometry to include elevation data (lat, lon, elevation)
-                        for (lat, lon), elev in zip(edge.geometry, elevations):
-                            geometry_with_elevation.append((lat, lon, elev))
-
-                        edge.geometry = geometry_with_elevation
-
-                        # Smooth before calculating to reduce SRTM noise
-                        smoothed = self.elevation_processor.smooth_elevation_profile(elevations, window_size=11)
-                        gain, loss = self.elevation_processor.calculate_elevation_gain_loss(smoothed)
-                        edge.elevation_gain = gain
-                        edge.elevation_loss = loss
-
-                        # Update node elevations with geometry endpoints if more accurate
-                        if elevations[0] > 0:
-                            source_node.elevation = elevations[0]
-                        if elevations[-1] > 0:
-                            target_node.elevation = elevations[-1]
-
-                        edges_with_geometry += 1
-                        logger.debug(f"Edge {u}->{v}: {len(elevations)} elevation points, gain={gain:.1f}m, loss={loss:.1f}m")
-                    else:
-                        # Fallback to simple calculation
-                        self._calculate_simple_elevation_diff(edge, source_node, target_node)
-
-                except Exception as e:
-                    logger.debug(f"Error processing geometry for edge {u}->{v}: {e}")
-                    # Fallback to simple calculation
+            # Sample DEM along the straight line between start and end nodes.
+            # OSM geometry is ignored — DEM is ground truth.
+            try:
+                sampled = self._sample_dem_along_edge(source_node, target_node, edge.distance)
+                if sampled:
+                    edge.geometry = sampled  # list of (lat, lon, elev)
+                    elevations = [pt[2] for pt in sampled]
+                    smoothed = self.elevation_processor.smooth_elevation_profile(elevations, window_size=5)
+                    gain, loss = self.elevation_processor.calculate_elevation_gain_loss(smoothed)
+                    edge.elevation_gain = gain
+                    edge.elevation_loss = loss
+                    # Anchor node elevations to DEM values at their exact coordinates
+                    if sampled[0][2] is not None:
+                        source_node.elevation = sampled[0][2]
+                    if sampled[-1][2] is not None:
+                        target_node.elevation = sampled[-1][2]
+                    edges_with_geometry += 1
+                else:
                     self._calculate_simple_elevation_diff(edge, source_node, target_node)
-            else:
-                # No detailed geometry, use simple start/end calculation
+            except Exception as e:
+                logger.debug(f"Error sampling DEM for edge {u}->{v}: {e}")
                 self._calculate_simple_elevation_diff(edge, source_node, target_node)
 
             edges_processed += 1
@@ -403,6 +375,40 @@ class OSMProcessor:
                 logger.debug(f"Processed {edges_processed}/{G.number_of_edges()} edges")
 
         logger.info(f"Calculated metrics for {edges_processed} edges ({edges_with_geometry} with detailed elevation profiles)")
+
+    def _sample_dem_along_edge(
+        self, source_node: Node, target_node: Node, distance_m: float,
+        sample_interval_m: float = 30.0
+    ) -> List[tuple]:
+        """
+        Sample DEM at equal intervals along the great-circle between two nodes.
+        Returns list of (lat, lon, elevation).  Minimum 2 points (start + end).
+        """
+        n_samples = max(2, int(distance_m / sample_interval_m) + 1)
+        points = []
+        for i in range(n_samples):
+            t = i / (n_samples - 1)
+            lat = source_node.lat + t * (target_node.lat - source_node.lat)
+            lon = source_node.lon + t * (target_node.lon - source_node.lon)
+            elev = self.elevation_processor.get_elevation(lat, lon)
+            points.append((lat, lon, elev))
+        # Interpolate any None gaps
+        valid = [(i, p[2]) for i, p in enumerate(points) if p[2] is not None]
+        if not valid:
+            return []
+        for i, (lat, lon, elev) in enumerate(points):
+            if elev is None:
+                lo = next((j for j, _ in reversed(valid) if j < i), None)
+                hi = next((j for j, _ in valid if j > i), None)
+                if lo is not None and hi is not None:
+                    ratio = (i - lo) / (hi - lo)
+                    elev = dict(valid)[lo] + ratio * (dict(valid)[hi] - dict(valid)[lo])
+                elif lo is not None:
+                    elev = dict(valid)[lo]
+                else:
+                    elev = dict(valid)[hi]
+                points[i] = (lat, lon, elev)
+        return points
 
     def _calculate_simple_elevation_diff(self, edge: Edge, source_node: Node, target_node: Node) -> None:
         """Calculate simple elevation gain/loss from start and end points."""

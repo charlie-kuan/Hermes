@@ -11,18 +11,28 @@ function App() {
   const [apiConnected, setApiConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [route, setRoute] = useState(null);
-  const [error, setError] = useState(null);
 
-  // For route preview
-  const [selectedRoute, setSelectedRoute] = useState(null);
-  const [selectedWaypoints, setSelectedWaypoints] = useState([]);
+  // Lifted selection state (shared between RouteForm and Map3D)
+  const [selectedArea, setSelectedArea] = useState(null);
+  const [selectedPoints, setSelectedPoints] = useState([]);
+  const [nextUniqueId, setNextUniqueId] = useState(1);
 
-  // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('plan'); // 'plan' or 'results'
-  const [adminOpen, setAdminOpen] = useState(false);
+  const [wideMode, setWideMode] = useState(false);
+  const isAdminRoute = window.location.pathname === '/admin';
+  const [adminOpen, setAdminOpen] = useState(isAdminRoute);
+  const [theme, setTheme] = useState('light');
 
-  // Check API health and load areas on mount
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next === 'light' ? 'light' : '');
+  };
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
+  }, [theme]);
+
   useEffect(() => {
     checkApiHealth();
     loadAreas();
@@ -32,9 +42,8 @@ function App() {
     try {
       await apiService.checkHealth();
       setApiConnected(true);
-    } catch (err) {
+    } catch {
       setApiConnected(false);
-      console.error('API health check failed:', err);
     }
   };
 
@@ -42,168 +51,173 @@ function App() {
     try {
       const data = await apiService.getAreas();
       setAreas(data.areas || []);
-    } catch (err) {
-      console.error('Failed to load areas:', err);
+    } catch {
       showToast('無法載入區域列表', 'error');
     }
   };
 
+  // Area change: reset point selection
+  const handleAreaChange = (area) => {
+    setSelectedArea(area);
+    setSelectedPoints([]);
+    setNextUniqueId(1);
+    setRoute(null);
+  };
+
+  // Add point (from sidebar list or map click)
+  const handlePointAdd = (pointId) => {
+    setSelectedPoints(prev => [...prev, { id: nextUniqueId, pointId }]);
+    setNextUniqueId(prev => prev + 1);
+  };
+
+  const handlePointRemove = (uid) => {
+    setSelectedPoints(prev => prev.filter(item => item.id !== uid));
+  };
+
+  // Reorder via drag-and-drop
+  const handlePointReorder = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    setSelectedPoints(prev => {
+      const arr = [...prev];
+      const [moved] = arr.splice(fromIndex, 1);
+      arr.splice(toIndex, 0, moved);
+      return arr;
+    });
+  };
+
+  // Quick route pre-fill
+  const handleQuickRoute = (pointIds) => {
+    let uid = nextUniqueId;
+    setSelectedPoints(pointIds.map(pointId => ({ id: uid++, pointId })));
+    setNextUniqueId(uid);
+  };
 
   const handleClearRoute = () => {
+    setRoute(null);
+    setSelectedPoints([]);
+  };
+
+  // Goes back to form but keeps area + points so user can tweak and re-plan
+  const handleReplan = () => {
     setRoute(null);
   };
 
   const handlePlanRoute = async (params) => {
     setLoading(true);
-    setError(null);
     setRoute(null);
-
     try {
       const result = await apiService.planRoute(params);
       setRoute(result);
-      showToast('路線規劃完成！', 'success');
-      // Auto-switch to results tab
-      setActiveTab('results');
+      showToast('路線規劃完成', 'success');
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || '路線規劃失敗';
-      setError(errorMsg);
-      showToast(errorMsg, 'error');
-      console.error('Route planning failed:', err);
+      const msg = err.response?.data?.detail || err.message || '路線規劃失敗';
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleExport = (format) => {
-    showToast(`已匯出為 ${format.toUpperCase()}`, 'success');
   };
 
   const showToast = (message, type = 'info') => {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
-
     const container = document.getElementById('toast-container');
     container.appendChild(toast);
-
     setTimeout(() => {
-      toast.style.animation = 'slideOut 0.3s ease-out';
-      setTimeout(() => container.removeChild(toast), 300);
+      toast.style.animation = 'slideOut 0.25s ease-out';
+      setTimeout(() => container.removeChild(toast), 250);
     }, 3000);
   };
 
   return (
     <div className="app">
-      {/* Header */}
-      <header className="header">
-        <div className="header-content">
-          <h1>🏔️ Project Hermes</h1>
-          <p>一站式登山行程規劃系統</p>
+      {/* Topbar */}
+      <header className="topbar">
+        <div className="topbar-brand">
+          <span className="brand-icon">⛰️</span>
+          <span className="brand-name">Project Hermes</span>
+          <span className="brand-sub">百岳行程規劃</span>
         </div>
-        <div className="header-status" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span className={`status-indicator ${apiConnected ? 'connected' : ''}`}>
-            {apiConnected ? '🟢 已連接' : '🔴 未連接'}
+        <div className="topbar-actions">
+          <span className={`status-dot ${apiConnected ? 'online' : ''}`}>
+            {apiConnected ? 'API 已連線' : 'API 未連線'}
           </span>
-          <button
-            onClick={() => setAdminOpen(true)}
-            style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
-          >
-            ⚙️ 管理
+          <button className="btn-theme" onClick={toggleTheme} title={theme === 'dark' ? '切換亮色模式' : '切換暗色模式'}>
+            {theme === 'dark' ? '☀️' : '🌙'}
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="main-content">
-        {/* Left Sidebar */}
-        <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-          {/* Sidebar Header with Tabs */}
-          <div className="sidebar-header">
-            <div className="sidebar-tabs">
-              <button
-                className={`tab-button ${activeTab === 'plan' ? 'active' : ''}`}
-                onClick={() => setActiveTab('plan')}
-              >
-                📍 路線規劃
-              </button>
-              <button
-                className={`tab-button ${activeTab === 'results' ? 'active' : ''}`}
-                onClick={() => setActiveTab('results')}
-              >
-                📊 路線資訊
-              </button>
-            </div>
-            <button
-              className="sidebar-toggle"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              title={sidebarOpen ? '收起側邊欄' : '展開側邊欄'}
-            >
-              {sidebarOpen ? '◀' : '▶'}
-            </button>
-          </div>
-
-          {/* Sidebar Content */}
-          <div className="sidebar-content">
-            {activeTab === 'plan' && (
-              <RouteForm
-                areas={areas}
-                onSubmit={handlePlanRoute}
-                loading={loading}
-                onClearRoute={handleClearRoute}
-                onRouteSelect={setSelectedRoute}
-                onWaypointsChange={setSelectedWaypoints}
-              />
-            )}
-
-            {activeTab === 'results' && (
-              <ResultsPanel
-                route={route}
-                onExport={handleExport}
-              />
-            )}
-          </div>
-        </aside>
-
-        {/* Map Section */}
-        <main className="map-section">
-          <Map3D
-            route={route}
-            isLoop={false}
-            selectedRoute={selectedRoute}
-            selectedWaypoints={selectedWaypoints}
-          />
-
-          {/* Floating Toggle Button (when sidebar is closed) */}
-          {!sidebarOpen && (
-            <button
-              className="floating-toggle"
-              onClick={() => setSidebarOpen(true)}
-              title="展開側邊欄"
-            >
-              ▶
-            </button>
-          )}
-        </main>
+      {/* Full-screen map */}
+      <div className="map-canvas">
+        <Map3D
+          route={route}
+          availablePoints={selectedArea?.points || []}
+          selectedPoints={selectedPoints}
+          onPointClick={handlePointAdd}
+        />
       </div>
 
-      {/* Loading Overlay */}
+      {/* Glass Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? '' : 'hidden'} ${!route && wideMode ? 'wide' : ''}`}>
+        <div className="sidebar-header">
+          <span className="sidebar-header-title">
+            {route ? '📊 路線資訊' : '📍 路線規劃'}
+          </span>
+          {!route && (
+            <button
+              className={`btn-wide-toggle ${wideMode ? 'active' : ''}`}
+              onClick={() => setWideMode(w => !w)}
+              title={wideMode ? '收合成單欄' : '展開成雙欄'}
+            >
+              {wideMode ? '⊟' : '⊞'}
+            </button>
+          )}
+        </div>
+        <div className="sidebar-content">
+          {!route ? (
+            <RouteForm
+              areas={areas}
+              selectedArea={selectedArea}
+              selectedPoints={selectedPoints}
+              onAreaChange={handleAreaChange}
+              onPointAdd={handlePointAdd}
+              onPointRemove={handlePointRemove}
+              onPointReorder={handlePointReorder}
+              onQuickRoute={handleQuickRoute}
+              onSubmit={handlePlanRoute}
+              onClearRoute={handleClearRoute}
+              loading={loading}
+              wideMode={wideMode}
+            />
+          ) : (
+            <ResultsPanel route={route} onReplan={handleReplan} onClearRoute={handleClearRoute} />
+          )}
+        </div>
+      </aside>
+
+      {/* Sidebar Toggle */}
+      <button
+        className={`sidebar-toggle ${sidebarOpen ? 'sidebar-open' : ''} ${!route && wideMode ? 'wide' : ''}`}
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        title={sidebarOpen ? '收起側欄' : '展開側欄'}
+      >
+        {sidebarOpen ? '◀' : '▶'}
+      </button>
+
+
       {loading && (
         <div className="loading-overlay">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
+          <div className="loading-card">
+            <div className="spinner" />
             <p>正在規劃路線...</p>
-            <small style={{ marginTop: '10px', color: '#aaa', fontSize: '0.9em' }}>
-              首次規劃需要下載地圖數據，可能需要30-60秒
-            </small>
+            <small>首次規劃需下載地圖資料，約需 30–60 秒</small>
           </div>
         </div>
       )}
 
-      {/* Admin Panel */}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
-
-      {/* Toast Container */}
-      <div id="toast-container"></div>
+      <div id="toast-container" />
     </div>
   );
 }

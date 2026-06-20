@@ -58,7 +58,7 @@ class GPSTraceProcessor:
                 
                 # Get edge geometry or construct from nodes
                 if edge.geometry:
-                    edge_line = LineString([(lon, lat) for lat, lon in edge.geometry])
+                    edge_line = LineString([(pt[1], pt[0]) for pt in edge.geometry])
                 else:
                     node_u: Node = graph.nodes[u]['data']
                     node_v: Node = graph.nodes[v]['data']
@@ -808,7 +808,7 @@ class GPSTraceProcessor:
             
             # Get edge geometry
             if edge.geometry and len(edge.geometry) >= 2:
-                edge_line = LineString([(lon, lat) for lat, lon in edge.geometry])
+                edge_line = LineString([(pt[1], pt[0]) for pt in edge.geometry])
             else:
                 node_u: Node = graph.nodes[u]['data']
                 node_v: Node = graph.nodes[v]['data']

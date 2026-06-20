@@ -2,583 +2,342 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+const POINT_ICON = { trailhead: '🚩', peak: '⛰️', hut: '🏠', campsite: '⛺' };
+const POINT_LABEL = { trailhead: '登山口', peak: '山頭', hut: '山屋', campsite: '營地', intersection: '岔路' };
+
 export default function Map3D({
   route,
-  isLoop,
-  selectedRoute = null,
-  selectedWaypoints = []
+  availablePoints = [],
+  selectedPoints = [],
+  onPointClick,
 }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const markersRef = useRef([]);
+  const routeMarkersRef = useRef([]);
+  const areaMarkersRef = useRef([]);      // [{marker, el, pointId}]
+  const areaMarkerMapRef = useRef({});    // pointId → {marker, el}
   const [is3DMode, setIs3DMode] = useState(false);
-  const [mapStyle, setMapStyle] = useState('osm'); // 'osm', 'satellite', 'terrain'
+  const [mapStyle, setMapStyle] = useState('osm');
 
-  // Map style configurations using free open-source tiles
   const getMapStyle = (styleType) => {
-    const baseConfig = {
+    const base = {
       version: 8,
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       sources: {
         'terrarium-dem': {
           type: 'raster-dem',
-          tiles: [
-            'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
-          ],
+          tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
           encoding: 'terrarium',
           tileSize: 256,
-          maxzoom: 15
-        }
+          maxzoom: 15,
+        },
       },
-      terrain: {
-        source: 'terrarium-dem',
-        exaggeration: 1.5
-      }
+      terrain: { source: 'terrarium-dem', exaggeration: 1.5 },
     };
 
     if (styleType === 'satellite') {
       return {
-        ...baseConfig,
+        ...base,
         sources: {
-          ...baseConfig.sources,
+          ...base.sources,
           'satellite-tiles': {
             type: 'raster',
-            tiles: [
-              'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-              'https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-              'https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
-            ],
-            tileSize: 256,
-            maxzoom: 20,
-            attribution: '© Google'
-          }
+            tiles: ['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'],
+            tileSize: 256, maxzoom: 20, attribution: '© Google',
+          },
         },
-        layers: [
-          {
-            id: 'satellite',
-            type: 'raster',
-            source: 'satellite-tiles'
-          }
-        ]
-      };
-    } else if (styleType === 'terrain') {
-      return {
-        ...baseConfig,
-        sources: {
-          ...baseConfig.sources,
-          'topo-tiles': {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
-              'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
-              'https://c.tile.opentopomap.org/{z}/{x}/{y}.png'
-            ],
-            tileSize: 256,
-            maxzoom: 17,
-            attribution: '© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap'
-          }
-        },
-        layers: [
-          {
-            id: 'topo',
-            type: 'raster',
-            source: 'topo-tiles'
-          }
-        ]
-      };
-    } else {
-      // OSM
-      return {
-        ...baseConfig,
-        sources: {
-          ...baseConfig.sources,
-          'osm-tiles': {
-            type: 'raster',
-            tiles: [
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
-            tileSize: 256,
-            maxzoom: 19,
-            attribution: '© OpenStreetMap contributors'
-          }
-        },
-        layers: [
-          {
-            id: 'osm',
-            type: 'raster',
-            source: 'osm-tiles'
-          }
-        ]
+        layers: [{ id: 'satellite', type: 'raster', source: 'satellite-tiles' }],
       };
     }
+    if (styleType === 'terrain') {
+      return {
+        ...base,
+        sources: {
+          ...base.sources,
+          'topo-tiles': {
+            type: 'raster',
+            tiles: ['https://a.tile.opentopomap.org/{z}/{x}/{y}.png'],
+            tileSize: 256, maxzoom: 17,
+            attribution: '© OpenStreetMap contributors, SRTM | © OpenTopoMap',
+          },
+        },
+        layers: [{ id: 'topo', type: 'raster', source: 'topo-tiles' }],
+      };
+    }
+    return {
+      ...base,
+      sources: {
+        ...base.sources,
+        'osm-tiles': {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap contributors',
+        },
+      },
+      layers: [{ id: 'osm', type: 'raster', source: 'osm-tiles' }],
+    };
   };
 
   // Initialize map
   useEffect(() => {
     if (map.current) return;
-
     map.current = new maplibregl.Map({
       container: mapContainer.current,
       style: getMapStyle('osm'),
       center: [120.95, 23.45],
-      zoom: 13,
+      zoom: 8,
       pitch: 0,
       bearing: 0,
       maxPitch: 85,
-      antialias: true
+      antialias: true,
     });
-
-    // Add navigation controls
-    map.current.addControl(new maplibregl.NavigationControl({
-      visualizePitch: true,
-      showCompass: true
-    }), 'top-left');
-
-    // Add scale control
+    map.current.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left');
     map.current.addControl(new maplibregl.ScaleControl(), 'bottom-left');
-
-    // Add fullscreen control
-    map.current.addControl(new maplibregl.FullscreenControl(), 'top-left');
-
-    map.current.on('load', () => {
-      setIsMapLoaded(true);
-    });
-
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
+    map.current.on('load', () => setIsMapLoaded(true));
+    return () => { map.current?.remove(); map.current = null; };
   }, []);
 
-  // Clear existing markers
-  const clearMarkers = () => {
-    markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = [];
-  };
-
-
-  // Draw route
+  // ── Create area markers once when area changes; fly to bounds ──
   useEffect(() => {
-    if (!map.current || !isMapLoaded || !route) return;
+    if (!map.current || !isMapLoaded) return;
 
-    // Remove existing route layer and source
-    if (map.current.getLayer('route')) {
-      map.current.removeLayer('route');
-    }
-    if (map.current.getLayer('route-outline')) {
-      map.current.removeLayer('route-outline');
-    }
-    if (map.current.getSource('route')) {
-      map.current.removeSource('route');
-    }
+    // Tear down old markers
+    areaMarkersRef.current.forEach(({ marker }) => marker.remove());
+    areaMarkersRef.current = [];
+    areaMarkerMapRef.current = {};
 
-    // Extract route coordinates
-    const routeCoordinates = route.segments?.flatMap(segment => {
-      if (segment.geometry && segment.geometry.length > 0) {
-        return segment.geometry.map(point => [point[1] || point.lon, point[0] || point.lat]);
+    if (availablePoints.length === 0) return;
+
+    // Fly to fit area
+    const bounds = availablePoints.reduce(
+      (b, p) => b.extend([p.lon, p.lat]),
+      new maplibregl.LngLatBounds([availablePoints[0].lon, availablePoints[0].lat], [availablePoints[0].lon, availablePoints[0].lat])
+    );
+    map.current.fitBounds(bounds, { padding: 80, duration: 800, maxZoom: 14 });
+
+    availablePoints.forEach(point => {
+      const icon = POINT_ICON[point.type] || '📍';
+      const label = POINT_LABEL[point.type] || '節點';
+      const typeColor = point.type === 'peak' ? '#f97316'
+        : point.type === 'hut' ? '#a78bfa'
+        : point.type === 'trailhead' ? '#4ade80'
+        : '#94a3b8';
+
+      // Outer wrapper — maplibre owns this element's inline style for positioning.
+      // Never touch el.style after handing it to Marker.
+      const el = document.createElement('div');
+
+      // Inner element — we update this freely without disturbing maplibre's transform.
+      const inner = document.createElement('div');
+      inner.style.cssText = `
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        background: rgba(10,18,12,0.85);
+        border: 2px solid ${typeColor};
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; cursor: pointer;
+        transition: transform 0.15s, background 0.15s, width 0.15s, height 0.15s;
+      `;
+      inner.textContent = icon;
+      el.appendChild(inner);
+
+      const popup = new maplibregl.Popup({
+        offset: 20, closeButton: false, closeOnClick: false, focusAfterOpen: false,
+      });
+
+      inner.addEventListener('mouseenter', () => {
+        inner.style.transform = 'scale(1.2)';
+        const entry = areaMarkerMapRef.current[point.id];
+        const orders = entry?.orders || [];
+        popup.setHTML(`
+          <div style="font-family:-apple-system,sans-serif;padding:4px 2px">
+            <strong style="font-size:0.9rem">${icon} ${point.name}</strong><br/>
+            <span style="font-size:0.78rem;color:#64748b">${label} · ${point.elevation}m</span>
+            ${orders.length > 0 ? `<br/><span style="font-size:0.75rem;color:#10b981">順序：${orders.join(', ')}</span>` : ''}
+          </div>
+        `).setLngLat([point.lon, point.lat]).addTo(map.current);
+      });
+      inner.addEventListener('mouseleave', () => {
+        inner.style.transform = '';
+        popup.remove();
+      });
+      inner.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (onPointClick) onPointClick(point.id);
+      });
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([point.lon, point.lat])
+        .addTo(map.current);
+
+      const entry = { marker, el, inner, orders: [] };
+      areaMarkersRef.current.push(entry);
+      areaMarkerMapRef.current[point.id] = entry;
+    });
+  }, [availablePoints, isMapLoaded]);
+
+  // ── Update marker appearance when selection changes (no recreate, no camera move) ──
+  useEffect(() => {
+    if (!map.current || !isMapLoaded || availablePoints.length === 0) return;
+
+    // Build orderMap
+    const orderMap = {};
+    selectedPoints.forEach((item, index) => {
+      if (!orderMap[item.pointId]) orderMap[item.pointId] = [];
+      orderMap[item.pointId].push(index + 1);
+    });
+
+    availablePoints.forEach(point => {
+      const entry = areaMarkerMapRef.current[point.id];
+      if (!entry) return;
+
+      const orders = orderMap[point.id] || [];
+      entry.orders = orders; // keep fresh for popup
+      const isSelected = orders.length > 0;
+      const icon = POINT_ICON[point.type] || '📍';
+      const typeColor = point.type === 'peak' ? '#f97316'
+        : point.type === 'hut' ? '#a78bfa'
+        : point.type === 'trailhead' ? '#4ade80'
+        : '#94a3b8';
+
+      const inner = entry.inner;
+      if (isSelected) {
+        inner.style.width = '36px';
+        inner.style.height = '36px';
+        inner.style.background = '#4ade80';
+        inner.style.border = '2.5px solid #fff';
+        inner.style.boxShadow = '0 0 0 3px rgba(74,222,128,0.4), 0 3px 10px rgba(0,0,0,0.5)';
+        inner.style.fontSize = '13px';
+        inner.style.fontWeight = '800';
+        inner.style.color = '#0a120c';
+        inner.style.zIndex = '20';
+        inner.textContent = orders.length === 1 ? String(orders[0]) : `×${orders.length}`;
+      } else {
+        inner.style.width = '32px';
+        inner.style.height = '32px';
+        inner.style.background = 'rgba(10,18,12,0.85)';
+        inner.style.border = `2px solid ${typeColor}`;
+        inner.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)';
+        inner.style.fontSize = '14px';
+        inner.style.fontWeight = '';
+        inner.style.color = '';
+        inner.style.zIndex = '10';
+        inner.textContent = icon;
       }
-      return [[segment.start_node.lon, segment.start_node.lat]];
+    });
+  }, [selectedPoints, isMapLoaded]);
+
+  // ── Route markers (after planning) ──
+  useEffect(() => {
+    if (!map.current || !isMapLoaded) return;
+
+    // Always clear previous route from map
+    ['route', 'route-outline'].forEach(id => {
+      if (map.current.getLayer(id)) map.current.removeLayer(id);
+    });
+    if (map.current.getSource('route')) map.current.removeSource('route');
+    routeMarkersRef.current.forEach(m => m.remove());
+    routeMarkersRef.current = [];
+
+    if (!route) return;
+
+    const coords = route.segments?.flatMap(seg => {
+      if (seg.geometry?.length > 0) return seg.geometry.map(p => [p[1] || p.lon, p[0] || p.lat]);
+      return [[seg.start_node.lon, seg.start_node.lat]];
     }) || [];
 
-    if (routeCoordinates.length > 0) {
-      // Add route source
+    if (coords.length > 0) {
       map.current.addSource('route', {
         type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: routeCoordinates
-          }
-        }
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } },
+      });
+      map.current.addLayer({ id: 'route-outline', type: 'line', source: 'route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.7 },
+      });
+      map.current.addLayer({ id: 'route', type: 'line', source: 'route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ef4444', 'line-width': 4, 'line-opacity': 0.95 },
       });
 
-      // Add route outline
-      map.current.addLayer({
-        id: 'route-outline',
-        type: 'line',
-        source: 'route',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 6,
-          'line-opacity': 0.8
-        }
-      });
-
-      // Add route layer
-      map.current.addLayer({
-        id: 'route',
-        type: 'line',
-        source: 'route',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#2563eb',
-          'line-width': 4,
-          'line-opacity': 0.9
-        }
-      });
-
-      // Fit map to route bounds
-      const bounds = routeCoordinates.reduce((bounds, coord) => {
-        return bounds.extend(coord);
-      }, new maplibregl.LngLatBounds(routeCoordinates[0], routeCoordinates[0]));
-
-      map.current.fitBounds(bounds, {
-        padding: 50,
-        duration: 1000
-      });
+      const bounds = coords.reduce((b, c) => b.extend(c),
+        new maplibregl.LngLatBounds(coords[0], coords[0]));
+      map.current.fitBounds(bounds, { padding: 60, duration: 1000 });
     }
 
-    // Collect all unique segment nodes
-    const seenIds = new Set();
-    const allNodes = [];
-    if (route.segments && route.segments.length > 0) {
-      route.segments.forEach((seg, i) => {
-        if (!seenIds.has(seg.start_node.id)) {
-          seenIds.add(seg.start_node.id);
-          allNodes.push({ node: seg.start_node, role: i === 0 ? 'start' : 'middle' });
-        }
-        if (i === route.segments.length - 1) {
-          if (!seenIds.has(seg.end_node.id)) {
-            seenIds.add(seg.end_node.id);
-            allNodes.push({ node: seg.end_node, role: 'end' });
-          }
-        }
-      });
-    }
-
-    const typeIcon = (type) => {
-      switch (type) {
-        case 'peak': return '⛰️';
-        case 'hut': return '🏠';
-        case 'campsite': return '⛺';
-        case 'trailhead': return '🚩';
-        default: return '📍';
-      }
-    };
-    const typeLabel = (type) => {
-      switch (type) {
-        case 'peak': return '山頂';
-        case 'hut': return '山屋';
-        case 'campsite': return '營地';
-        case 'trailhead': return '登山口';
-        case 'intersection': return '岔路';
-        default: return '節點';
-      }
-    };
-
-    const significantTypes = new Set(['peak', 'hut', 'campsite', 'trailhead']);
-
-    allNodes.forEach(({ node, role }) => {
-      const isEndpoint = role === 'start' || role === 'end';
-      if (!isEndpoint && !significantTypes.has(node.type)) return;
-
-      const color = role === 'start' ? '#10b981' :
-                    role === 'end' ? '#ef4444' :
-                    node.type === 'peak' ? '#f97316' :
-                    node.type === 'hut' ? '#8b5cf6' :
-                    node.type === 'campsite' ? '#06b6d4' :
-                    '#64748b';
-
-      const size = isEndpoint ? 34 : 26;
-      const icon = isEndpoint
-        ? (role === 'start' ? '🚩' : '🏁')
-        : typeIcon(node.type);
-
-      const el = document.createElement('div');
-      el.style.cssText = `
-        background-color: ${color};
-        width: ${size}px;
-        height: ${size}px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: ${isEndpoint ? 16 : 13}px;
-        cursor: pointer;
-        z-index: ${isEndpoint ? 10 : 5};
-      `;
-      el.textContent = icon;
-
-      const label = role === 'start' ? '起點' : role === 'end' ? '終點' : typeLabel(node.type);
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([node.lon, node.lat])
-        .setPopup(new maplibregl.Popup({ offset: 25 })
-          .setHTML(`
-            <strong>${node.name || label}</strong><br/>
-            ${label}<br/>
-            海拔: ${node.elevation?.toFixed(0)}m
-            ${node.amenities?.length > 0 ? `<br/>設施: ${node.amenities.join(', ')}` : ''}
-          `))
-        .addTo(map.current);
-
-      markersRef.current.push(marker);
-    });
   }, [route, isMapLoaded]);
 
-  // Handle preview waypoints
-  useEffect(() => {
-    if (!map.current || !isMapLoaded || !selectedRoute || route) return;
-
-    clearMarkers();
-
-    // Add trailhead
-    if (selectedRoute.trailhead) {
-      const el = document.createElement('div');
-      el.style.cssText = `
-        background-color: #10b981;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        cursor: pointer;
-      `;
-      el.textContent = '🚩';
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([selectedRoute.trailhead.lon, selectedRoute.trailhead.lat])
-        .setPopup(new maplibregl.Popup({ offset: 25 })
-          .setHTML(`
-            <strong>🚩 ${selectedRoute.trailhead.name}</strong><br/>
-            登山口<br/>
-            海拔: ${selectedRoute.trailhead.elevation}m
-            ${selectedRoute.trailhead.facilities ? `<br/>設施: ${selectedRoute.trailhead.facilities.join(', ')}` : ''}
-          `))
-        .addTo(map.current);
-
-      markersRef.current.push(marker);
-
-      // Center on trailhead
-      map.current.flyTo({
-        center: [selectedRoute.trailhead.lon, selectedRoute.trailhead.lat],
-        zoom: 14
-      });
-    }
-
-    // Add selected waypoints
-    selectedRoute.waypoints
-      ?.filter(wp => selectedWaypoints.includes(wp.name))
-      .forEach(waypoint => {
-        const color = waypoint.type === 'peak' ? '#f97316' :
-                     waypoint.type === 'hut' ? '#8b5cf6' : '#eab308';
-        const icon = waypoint.type === 'peak' ? '⛰️' :
-                    waypoint.type === 'hut' ? '🏠' : '📍';
-
-        const el = document.createElement('div');
-        el.style.cssText = `
-          background-color: ${color};
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          cursor: pointer;
-        `;
-        el.textContent = icon;
-
-        const marker = new maplibregl.Marker({ element: el })
-          .setLngLat([waypoint.lon, waypoint.lat])
-          .setPopup(new maplibregl.Popup({ offset: 25 })
-            .setHTML(`
-              <strong>${icon} ${waypoint.name}</strong><br/>
-              ${waypoint.type === 'peak' ? '山頭' : waypoint.type === 'hut' ? '山屋' : '中繼點'}<br/>
-              海拔: ${waypoint.elevation}m
-              ${waypoint.facilities ? `<br/>設施: ${waypoint.facilities.join(', ')}` : ''}
-              ${waypoint.required ? '<br/>⚠️ 必經點' : ''}
-            `))
-          .addTo(map.current);
-
-        markersRef.current.push(marker);
-      });
-  }, [selectedRoute, selectedWaypoints, isMapLoaded, route]);
-
-  // Toggle 3D mode
   const toggle3D = () => {
     if (!map.current) return;
-
-    if (is3DMode) {
-      // Switch to 2D
-      map.current.easeTo({
-        pitch: 0,
-        bearing: 0,
-        duration: 1000
-      });
-      setIs3DMode(false);
-    } else {
-      // Switch to 3D
-      map.current.easeTo({
-        pitch: 60,
-        bearing: 0,
-        duration: 1000
-      });
-      setIs3DMode(true);
-    }
+    map.current.easeTo({ pitch: is3DMode ? 0 : 60, bearing: 0, duration: 800 });
+    setIs3DMode(!is3DMode);
   };
 
-  // Switch map style
   const switchMapStyle = (styleType) => {
     if (!map.current || mapStyle === styleType) return;
-
     setMapStyle(styleType);
-    // Set to false to trigger route redraw after style loads
     setIsMapLoaded(false);
     map.current.setStyle(getMapStyle(styleType));
+    map.current.once('styledata', () => setIsMapLoaded(true));
+  };
 
-    // Wait for style to load before marking as loaded
-    map.current.once('styledata', () => {
-      setIsMapLoaded(true);
-    });
+  // Map controls dark style
+  const ctrlBase = {
+    display: 'block', width: '100%', padding: '8px 14px', border: 'none',
+    cursor: 'pointer', fontSize: '0.82rem', textAlign: 'left', transition: 'all 0.15s',
   };
 
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
       <div ref={mapContainer} style={{ height: '100%', width: '100%' }} />
 
-      {/* Control Panel */}
-      <div style={{
-        position: 'absolute',
-        top: '10px',
-        right: '10px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        zIndex: 1000
-      }}>
-        {/* 3D Toggle Button */}
+      {/* Map controls — dark themed */}
+      <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 1000 }}>
         <button
           onClick={toggle3D}
           style={{
-            background: is3DMode ? '#2563eb' : 'white',
-            color: is3DMode ? 'white' : '#1e293b',
-            border: 'none',
-            padding: '10px 16px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            cursor: 'pointer',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          onMouseEnter={(e) => {
-            if (!is3DMode) {
-              e.target.style.background = '#f8fafc';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!is3DMode) {
-              e.target.style.background = 'white';
-            }
+            ...ctrlBase,
+            width: 'auto',
+            background: is3DMode ? '#4ade80' : 'rgba(10,18,12,0.88)',
+            color: is3DMode ? '#0a120c' : '#f0fdf4',
+            border: '1px solid rgba(74,222,128,0.3)',
+            borderRadius: 8,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            fontWeight: 600,
+            padding: '8px 14px',
           }}
         >
-          {is3DMode ? '🗻 3D 視角' : '🗺️ 2D 視角'}
+          {is3DMode ? '🗻 3D' : '🗺 2D'}
         </button>
 
-        {/* Map Style Switcher */}
         <div style={{
-          background: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          overflow: 'hidden'
+          background: 'rgba(10,18,12,0.88)',
+          border: '1px solid rgba(74,222,128,0.2)',
+          borderRadius: 8,
+          overflow: 'hidden',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
         }}>
-          <button
-            onClick={() => switchMapStyle('osm')}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '8px 12px',
-              border: 'none',
-              background: mapStyle === 'osm' ? '#2563eb' : 'white',
-              color: mapStyle === 'osm' ? 'white' : '#1e293b',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: mapStyle === 'osm' ? '600' : '400',
-              textAlign: 'left',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              if (mapStyle !== 'osm') e.target.style.background = '#f8fafc';
-            }}
-            onMouseLeave={(e) => {
-              if (mapStyle !== 'osm') e.target.style.background = 'white';
-            }}
-          >
-            🗺️ 標準地圖
-          </button>
-          <button
-            onClick={() => switchMapStyle('terrain')}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '8px 12px',
-              border: 'none',
-              borderTop: '1px solid #e2e8f0',
-              background: mapStyle === 'terrain' ? '#2563eb' : 'white',
-              color: mapStyle === 'terrain' ? 'white' : '#1e293b',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: mapStyle === 'terrain' ? '600' : '400',
-              textAlign: 'left',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              if (mapStyle !== 'terrain') e.target.style.background = '#f8fafc';
-            }}
-            onMouseLeave={(e) => {
-              if (mapStyle !== 'terrain') e.target.style.background = 'white';
-            }}
-          >
-            ⛰️ 地形圖
-          </button>
-          <button
-            onClick={() => switchMapStyle('satellite')}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '8px 12px',
-              border: 'none',
-              borderTop: '1px solid #e2e8f0',
-              background: mapStyle === 'satellite' ? '#2563eb' : 'white',
-              color: mapStyle === 'satellite' ? 'white' : '#1e293b',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: mapStyle === 'satellite' ? '600' : '400',
-              textAlign: 'left',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              if (mapStyle !== 'satellite') e.target.style.background = '#f8fafc';
-            }}
-            onMouseLeave={(e) => {
-              if (mapStyle !== 'satellite') e.target.style.background = 'white';
-            }}
-          >
-            🛰️ 衛星影像
-          </button>
+          {[
+            { key: 'osm', label: '🗺 標準地圖' },
+            { key: 'terrain', label: '⛰️ 地形圖' },
+            { key: 'satellite', label: '🛰 衛星影像' },
+          ].map(({ key, label }, i) => (
+            <button
+              key={key}
+              onClick={() => switchMapStyle(key)}
+              style={{
+                ...ctrlBase,
+                borderTop: i > 0 ? '1px solid rgba(74,222,128,0.15)' : 'none',
+                background: mapStyle === key ? '#4ade80' : 'transparent',
+                color: mapStyle === key ? '#0a120c' : '#86efac',
+                fontWeight: mapStyle === key ? 700 : 400,
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

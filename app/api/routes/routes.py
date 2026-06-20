@@ -29,8 +29,10 @@ from app.models.domain import (
 )
 from app.models.requests import RoutePlanRequest, TimeEstimateRequest
 from app.models.responses import (
+    DayPlanResponse,
     EquipmentRecommendationResponse,
     FoodRecommendationResponse,
+    LegResponse,
     NodeResponse,
     RouteResponse,
     RouteSegmentResponse,
@@ -129,6 +131,95 @@ def segment_to_response(segment: RouteSegment) -> RouteSegmentResponse:
         geometry=geometry
     )
 
+
+
+def _build_legs(segments: list, split_node_ids: list, name_by_node_id: dict = None) -> list:
+    """Aggregate segments into user-defined legs (start→via1→via2→end)."""
+    if not split_node_ids:
+        return []
+    name_by_node_id = name_by_node_id or {}
+    split_set = set(split_node_ids)
+    legs = []
+    current = []
+
+    def _named(node):
+        r = node_to_response(node)
+        if node.id in name_by_node_id:
+            r.name = name_by_node_id[node.id]
+        return r
+
+    for seg in segments:
+        current.append(seg)
+        if seg.end_node.id in split_set or seg is segments[-1]:
+            dist = sum(s.distance for s in current)
+            gain = sum(s.elevation_gain for s in current)
+            loss = sum(s.elevation_loss for s in current)
+            time = sum(s.estimated_time for s in current)
+            legs.append(LegResponse(
+                start_node=_named(current[0].start_node),
+                end_node=_named(current[-1].end_node),
+                distance=dist,
+                elevation_gain=gain,
+                elevation_loss=loss,
+                estimated_time=time,
+            ))
+            current = []
+    return legs
+
+
+def _build_day_plans(
+    segments: list,
+    overnight_node_ids: list,
+    estimation_service,
+    hiker_fitness: str,
+    pack_weight_kg: float,
+    night_by_node_id: dict = None,
+) -> list:
+    """Split route segments into per-day plans based on overnight stop node IDs."""
+    if not overnight_node_ids:
+        return []
+
+    stop_set = set(overnight_node_ids)
+    night_by_node_id = night_by_node_id or {}
+    days = []
+    current_segs = []
+    day_num = 1
+
+    for seg in segments:
+        current_segs.append(seg)
+        if seg.end_node.id in stop_set or seg is segments[-1]:
+            stop_node = seg.end_node if seg.end_node.id in stop_set else None
+            dist = sum(s.distance for s in current_segs)
+            gain = sum(s.elevation_gain for s in current_segs)
+            loss = sum(s.elevation_loss for s in current_segs)
+
+            from app.models.domain import Route as DomainRoute
+            dummy_route = DomainRoute(
+                route_id="",
+                segments=current_segs,
+                total_distance=dist,
+                total_elevation_gain=gain,
+                total_elevation_loss=loss,
+                estimated_time=0.0,
+                difficulty=max(s.difficulty for s in current_segs),
+                waypoints=[],
+            )
+            opt, norm, cons = estimation_service.estimate_route(dummy_route, hiker_fitness, pack_weight_kg)
+
+            night_label = night_by_node_id.get(stop_node.id) if stop_node else None
+            days.append(DayPlanResponse(
+                day=night_label if night_label is not None else day_num,
+                overnight_stop=node_to_response(stop_node) if stop_node else None,
+                segments=[segment_to_response(s) for s in current_segs],
+                distance=dist,
+                elevation_gain=gain,
+                elevation_loss=loss,
+                estimated_time=TimeEstimate(optimistic=opt, normal=norm, conservative=cons),
+            ))
+            day_num += 1
+            current_segs = []
+
+    return days
 
 
 @router.post("/routes/plan", response_model=RouteResponse, tags=["Routes"])
@@ -247,6 +338,27 @@ async def plan_route(
                            f"Please select a location closer to the trail network."
                 )
 
+        # Resolve overnight stop coordinates to node IDs
+        overnight_node_ids = []
+        night_by_node_id = {}
+        if request.overnight_stops:
+            for stop in request.overnight_stops:
+                s_lat = stop.get('lat')
+                s_lon = stop.get('lon')
+                if s_lat and s_lon:
+                    nid = graph_service.find_nearest_node(graph, s_lat, s_lon)
+                    if nid:
+                        overnight_node_ids.append(nid)
+                        if stop.get('night'):
+                            night_by_node_id[nid] = stop['night']
+
+        # Build name map for user-selected points (to override "intersection" labels)
+        name_by_node_id = {}
+        if request.start_name and start_node_id:
+            name_by_node_id[start_node_id] = request.start_name
+        if request.end_name and end_node_id:
+            name_by_node_id[end_node_id] = request.end_name
+
         # Convert via points to node IDs
         via_node_ids = None
         if request.via_points:
@@ -258,6 +370,8 @@ async def plan_route(
                     via_id = graph_service.find_nearest_node(graph, via_lat, via_lon)
                     if via_id:
                         via_node_ids.append(via_id)
+                        if via_point.get('name'):
+                            name_by_node_id[via_id] = via_point['name']
 
         # Plan the route
         route = routing_service.plan_route(
@@ -296,6 +410,20 @@ async def plan_route(
             route, request.hiker_fitness, request.pack_weight_kg
         )
 
+        # Build legs between user-selected points (via + end)
+        leg_split_ids = (via_node_ids or []) + ([end_node_id] if end_node_id else [start_node_id])
+        legs = _build_legs(route.segments, leg_split_ids, name_by_node_id=name_by_node_id)
+
+        # Build day plans if overnight stops were provided
+        day_plans = _build_day_plans(
+            route.segments,
+            overnight_node_ids,
+            estimation_service,
+            request.hiker_fitness,
+            request.pack_weight_kg or 12.0,
+            night_by_node_id=night_by_node_id,
+        )
+
         # Cache route
         route_cache[route.route_id] = route
 
@@ -311,6 +439,8 @@ async def plan_route(
             difficulty=route.difficulty.name.lower(),
             is_loop=route.is_loop,
             waypoints=[node_to_response(w) for w in route.waypoints],
+            legs=legs,
+            day_plans=day_plans,
             equipment=[
                 EquipmentRecommendationResponse(
                     category=e.category,

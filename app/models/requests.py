@@ -15,6 +15,9 @@ class RoutePlanRequest(BaseModel):
     end_lat: Optional[float] = Field(None, ge=-90, le=90, description="End latitude (optional for loops)")
     end_lon: Optional[float] = Field(None, ge=-180, le=180, description="End longitude (optional for loops)")
 
+    start_name: Optional[str] = Field(None, description="Display name for the start point")
+    end_name: Optional[str] = Field(None, description="Display name for the end point")
+
     # Route Type
     loop_route: bool = Field(default=False, description="Create a loop route returning to start")
 
@@ -29,6 +32,12 @@ class RoutePlanRequest(BaseModel):
     required_waypoints: Optional[List[str]] = Field(
         None,
         description="Required waypoint types (peak, hut, etc.)"
+    )
+
+    # Overnight stops (shelters/huts where hiker will spend the night)
+    overnight_stops: Optional[List[dict]] = Field(
+        None,
+        description="Shelter stops for multi-day routes (list of {lat, lon, name})"
     )
 
     # Hiker Parameters

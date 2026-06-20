@@ -87,6 +87,27 @@ class FoodRecommendationResponse(BaseModel):
     notes: List[str] = Field(default_factory=list)
 
 
+class LegResponse(BaseModel):
+    """One user-defined leg (between two selected points)."""
+    start_node: NodeResponse
+    end_node: NodeResponse
+    distance: float
+    elevation_gain: float
+    elevation_loss: float
+    estimated_time: float  # normal estimate in hours
+
+
+class DayPlanResponse(BaseModel):
+    """One day's plan within a multi-day route."""
+    day: int
+    overnight_stop: Optional[NodeResponse] = None  # None for the last day
+    segments: List[RouteSegmentResponse]
+    distance: float
+    elevation_gain: float
+    elevation_loss: float
+    estimated_time: TimeEstimate
+
+
 class RouteResponse(BaseModel):
     """Complete route information."""
     route_id: str
@@ -99,6 +120,8 @@ class RouteResponse(BaseModel):
     difficulty: str
     is_loop: bool
     waypoints: List[NodeResponse] = Field(default_factory=list)
+    legs: List[LegResponse] = Field(default_factory=list)
+    day_plans: List[DayPlanResponse] = Field(default_factory=list)
 
     # Recommendations
     equipment: List[EquipmentRecommendationResponse] = Field(default_factory=list)
