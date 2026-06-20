@@ -159,20 +159,18 @@ function App() {
       </div>
 
       {/* Glass Sidebar */}
-      <aside className={`sidebar ${sidebarOpen ? '' : 'hidden'} ${!route && wideMode ? 'wide' : ''}`}>
+      <aside className={`sidebar ${sidebarOpen ? '' : 'hidden'} ${wideMode ? 'wide' : ''}`}>
         <div className="sidebar-header">
           <span className="sidebar-header-title">
             {route ? '📊 路線資訊' : '📍 路線規劃'}
           </span>
-          {!route && (
-            <button
-              className={`btn-wide-toggle ${wideMode ? 'active' : ''}`}
-              onClick={() => setWideMode(w => !w)}
-              title={wideMode ? '收合成單欄' : '展開成雙欄'}
-            >
-              {wideMode ? '⊟' : '⊞'}
-            </button>
-          )}
+          <button
+            className={`btn-wide-toggle ${wideMode ? 'active' : ''}`}
+            onClick={() => setWideMode(w => !w)}
+            title={wideMode ? '收合成單欄' : '展開成雙欄'}
+          >
+            {wideMode ? '⊟' : '⊞'}
+          </button>
         </div>
         <div className="sidebar-content">
           {!route ? (
@@ -191,7 +189,12 @@ function App() {
               wideMode={wideMode}
             />
           ) : (
-            <ResultsPanel route={route} onReplan={handleReplan} onClearRoute={handleClearRoute} />
+            <ResultsPanel
+              route={route}
+              onReplan={handleReplan}
+              onClearRoute={handleClearRoute}
+              wideMode={wideMode}
+            />
           )}
         </div>
       </aside>

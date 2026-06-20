@@ -174,6 +174,7 @@ def _build_day_plans(
     hiker_fitness: str,
     pack_weight_kg: float,
     night_by_node_id: dict = None,
+    name_override_by_node_id: dict = None,
 ) -> list:
     """Split route segments into per-day plans based on overnight stop node IDs."""
     if not overnight_node_ids:
@@ -181,6 +182,7 @@ def _build_day_plans(
 
     stop_set = set(overnight_node_ids)
     night_by_node_id = night_by_node_id or {}
+    name_override_by_node_id = name_override_by_node_id or {}
     days = []
     current_segs = []
     day_num = 1
@@ -206,9 +208,10 @@ def _build_day_plans(
             )
             opt, norm, cons = estimation_service.estimate_route(dummy_route, hiker_fitness, pack_weight_kg)
 
-            night_label = night_by_node_id.get(stop_node.id) if stop_node else None
+            if stop_node and not stop_node.name and stop_node.id in name_override_by_node_id:
+                stop_node.name = name_override_by_node_id[stop_node.id]
             days.append(DayPlanResponse(
-                day=night_label if night_label is not None else day_num,
+                day=day_num,
                 overnight_stop=node_to_response(stop_node) if stop_node else None,
                 segments=[segment_to_response(s) for s in current_segs],
                 distance=dist,
@@ -341,6 +344,7 @@ async def plan_route(
         # Resolve overnight stop coordinates to node IDs
         overnight_node_ids = []
         night_by_node_id = {}
+        name_override_by_node_id = {}
         if request.overnight_stops:
             for stop in request.overnight_stops:
                 s_lat = stop.get('lat')
@@ -351,6 +355,8 @@ async def plan_route(
                         overnight_node_ids.append(nid)
                         if stop.get('night'):
                             night_by_node_id[nid] = stop['night']
+                        if stop.get('name'):
+                            name_override_by_node_id[nid] = stop['name']
 
         # Build name map for user-selected points (to override "intersection" labels)
         name_by_node_id = {}
@@ -422,6 +428,7 @@ async def plan_route(
             request.hiker_fitness,
             request.pack_weight_kg or 12.0,
             night_by_node_id=night_by_node_id,
+            name_override_by_node_id=name_override_by_node_id,
         )
 
         # Cache route
