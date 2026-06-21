@@ -17,6 +17,10 @@ elevation==1.1.3
 srtm.py==0.3.7
 rasterio==1.3.9
 
+# Map export
+matplotlib>=3.8.0
+scipy>=1.12.0
+
 # Data
 numpy==1.26.3
 pandas==2.2.0

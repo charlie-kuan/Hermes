@@ -26,12 +26,13 @@ export default function ResultsPanel({ route, onReplan, onClearRoute, wideMode =
   };
 
   const handleExport = async (format) => {
+    const extMap = { gpx: 'gpx', geojson: 'geojson', map_png: 'png', map_pdf: 'pdf' };
     try {
       const blob = await apiService.exportRoute(route.route_id, format);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `route_${route.route_id.substring(0, 8)}.${format}`;
+      a.download = `route_${route.route_id.substring(0, 8)}_map.${extMap[format] ?? format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -154,6 +155,8 @@ export default function ResultsPanel({ route, onReplan, onClearRoute, wideMode =
                 <div className="export-buttons">
                   <button className="btn-secondary" onClick={() => handleExport('gpx')}>📍 GPX</button>
                   <button className="btn-secondary" onClick={() => handleExport('geojson')}>🗺 GeoJSON</button>
+                  <button className="btn-secondary" onClick={() => handleExport('map_png')}>🏔 地圖 PNG</button>
+                  <button className="btn-secondary" onClick={() => handleExport('map_pdf')}>🏔 地圖 PDF</button>
                 </div>
               </div>
             </div>
@@ -362,6 +365,8 @@ export default function ResultsPanel({ route, onReplan, onClearRoute, wideMode =
           <div className="export-buttons">
             <button className="btn-secondary" onClick={() => handleExport('gpx')}>📍 GPX</button>
             <button className="btn-secondary" onClick={() => handleExport('geojson')}>🗺 GeoJSON</button>
+            <button className="btn-secondary" onClick={() => handleExport('map_png')}>🏔 地圖 PNG</button>
+            <button className="btn-secondary" onClick={() => handleExport('map_pdf')}>🏔 地圖 PDF</button>
           </div>
         </div>
       </div>

@@ -17,8 +17,8 @@ module.exports = {
     },
     {
       name: "hermes-frontend",
-      script: "serve",
-      args: "-s dist -l 4000 --single",
+      script: "/usr/local/bin/serve",
+      args: "dist -s -l 4000",
       cwd: "/root/Project/Hermes/frontend",
       interpreter: "none",
       autorestart: true,

@@ -1,6 +1,8 @@
 """Route planning endpoint handlers."""
 
-from typing import Dict, Optional
+import csv
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -48,6 +50,36 @@ router = APIRouter()
 
 # In-memory route cache (in production, use Redis or similar)
 route_cache: Dict[str, Route] = {}
+
+SHOW_ON_MAP = {"peak", "shelter", "hut", "viewpoint", "campsite", "trailhead"}
+
+
+def _load_area_points(area_id: Optional[str]) -> List[dict]:
+    """Load peak/shelter/etc. from data/areas/{area_id}/points.csv as plain dicts."""
+    if not area_id:
+        return []
+    csv_path = Path("data/areas") / area_id / "points.csv"
+    if not csv_path.exists():
+        return []
+    points = []
+    try:
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row.get("type", "").strip() not in SHOW_ON_MAP:
+                    continue
+                try:
+                    points.append({
+                        "lat": float(row["lat"]),
+                        "lon": float(row["lon"]),
+                        "name": (row.get("name") or row.get("name_en") or "").strip(),
+                        "type": row.get("type", "").strip(),
+                        "elevation": float(row["elevation"]) if row.get("elevation") else None,
+                    })
+                except (ValueError, KeyError):
+                    continue
+    except Exception as e:
+        logger.warning(f"Could not load area points for {area_id}: {e}")
+    return points
 
 
 def _resolve_node_id(
@@ -601,15 +633,16 @@ async def get_route(
 @router.get("/routes/{route_id}/export", tags=["Routes"])
 async def export_route(
     route_id: str,
-    format: str = Query("gpx", regex="^(gpx|geojson)$"),
-    export_service: ExportService = Depends(get_export_service)
+    format: str = Query("gpx", regex="^(gpx|geojson|map_png|map_pdf)$"),
+    export_service: ExportService = Depends(get_export_service),
+    graph_service: GraphService = Depends(get_graph_service)
 ):
     """
-    Export a route to GPX or GeoJSON format.
+    Export a route to GPX, GeoJSON, or a contour map image (PNG/PDF).
 
     Args:
         route_id: Route identifier
-        format: Export format (gpx or geojson)
+        format: Export format (gpx | geojson | map_png | map_pdf)
 
     Returns:
         Route file in requested format
@@ -624,10 +657,19 @@ async def export_route(
             content = export_service.export_to_gpx(route)
             media_type = "application/gpx+xml"
             filename = f"route_{route_id[:8]}.gpx"
-        else:  # geojson
+        elif format == "geojson":
             content = export_service.export_to_geojson(route)
             media_type = "application/geo+json"
             filename = f"route_{route_id[:8]}.geojson"
+        else:  # map_png / map_pdf
+            fmt = "pdf" if format == "map_pdf" else "png"
+            nearby_nodes = _load_area_points(route.area_id)
+            logger.info(f"Map export: loaded {len(nearby_nodes)} area points for {route.area_id}")
+            content = export_service.export_to_map_image(
+                route, fmt=fmt, nearby_nodes=nearby_nodes
+            )
+            media_type = "application/pdf" if fmt == "pdf" else "image/png"
+            filename = f"route_{route_id[:8]}_map.{fmt}"
 
         return Response(
             content=content,
