@@ -246,6 +246,7 @@ class ExportService:
             import numpy as np
 
             # Register and apply Noto Sans TC for Chinese support
+            from pathlib import Path
             _noto_path = Path(__file__).parents[2] / "assets/fonts/NotoSansTC-Regular.otf"
             try:
                 fm.fontManager.addfont(str(_noto_path))
@@ -586,10 +587,10 @@ class ExportService:
 
             gdf.plot(
                 ax=ax,
-                facecolor="#2c6fad",
-                edgecolor="#2c6fad",
+                facecolor="#1a4f80",
+                edgecolor="#1a4f80",
                 linewidth=0.3,
-                alpha=0.6,
+                alpha=0.8,
                 zorder=3,
             )
         except Exception as e:
