@@ -343,7 +343,7 @@ class ExportService:
                 levels=levels_major, colors="#4a6070", linewidths=0.6, alpha=0.65,
             )
             clabels = ax.clabel(
-                cs_major, fmt="%dm", fontsize=7, inline=True, inline_spacing=4,
+                cs_major, fmt="%dm", fontsize=9, inline=True, inline_spacing=4,
             )
             # White halo behind contour labels so they lift off the lines
             for txt in clabels:
@@ -417,7 +417,7 @@ class ExportService:
                 f"{label}{elev_str}",
                 xy=(lon, lat),
                 xytext=(5, 5), textcoords="offset points",
-                fontsize=8, color="#111", alpha=alpha,
+                fontsize=10, color="#111", alpha=alpha,
                 zorder=zorder + 1,
                 path_effects=[
                     pe.withStroke(linewidth=3.5, foreground="white", alpha=0.95),
@@ -438,9 +438,9 @@ class ExportService:
         # ── 7. Axes / title ──────────────────────────────────────────────
         ax.set_xlim(bbox[0], bbox[2])
         ax.set_ylim(bbox[1], bbox[3])
-        ax.set_xlabel("Longitude", fontsize=10)
-        ax.set_ylabel("Latitude", fontsize=10)
-        ax.tick_params(labelsize=9)
+        ax.set_xlabel("Longitude", fontsize=12)
+        ax.set_ylabel("Latitude", fontsize=12)
+        ax.tick_params(labelsize=11)
 
         route_name = f"Route {route.route_id[:8]}"
         title_lines = [
@@ -451,7 +451,7 @@ class ExportService:
             f"{route.estimated_time:.1f} h  |  "
             f"{route.difficulty.name.capitalize()}",
         ]
-        ax.set_title("\n".join(title_lines), fontsize=11, loc="left", pad=8)
+        ax.set_title("\n".join(title_lines), fontsize=13, loc="left", pad=8)
 
         # Legend
         from matplotlib.lines import Line2D
@@ -468,7 +468,7 @@ class ExportService:
         ]
         ax.legend(
             handles=legend_elements, loc="lower right",
-            fontsize=8, framealpha=0.85, ncol=2,
+            fontsize=10, framealpha=0.85, ncol=2,
         )
 
         # ── Scale bar (bottom-left) ──────────────────────────────────────
@@ -579,13 +579,20 @@ class ExportService:
             tr = Transformer.from_crs("EPSG:4326", "EPSG:3826", always_xy=True)
             x_min, y_min = tr.transform(west, south)
             x_max, y_max = tr.transform(east, north)
-            gdf = gpd.read_file(shp, bbox=(x_min, y_min, x_max, y_max))
+            gdf = gpd.read_file(shp, bbox=(x_min, y_min, x_max, y_max), encoding="utf-8")
             if gdf.empty:
                 return
 
             gdf = gdf.set_crs("EPSG:3826").to_crs("EPSG:4326")
 
-            gdf.plot(
+            # Clip to map bbox so centroids stay within the visible area
+            from shapely.geometry import box as shapely_box
+            bbox_geom = shapely_box(west, south, east, north)
+            gdf_clipped = gdf.copy()
+            gdf_clipped["geometry"] = gdf.intersection(bbox_geom)
+            gdf_clipped = gdf_clipped[~gdf_clipped.is_empty]
+
+            gdf_clipped.plot(
                 ax=ax,
                 facecolor="#1a4f80",
                 edgecolor="#1a4f80",
@@ -593,8 +600,32 @@ class ExportService:
                 alpha=0.8,
                 zorder=3,
             )
+
+            # Label each river name once, at the centroid of the largest clipped polygon
+            import matplotlib.patheffects as pe
+            if "RIVER_NAME" in gdf_clipped.columns:
+                labeled = set()
+                # Sort by area descending so largest visible polygon wins when deduplicating
+                gdf_clipped = gdf_clipped.copy()
+                gdf_clipped["_area"] = gdf_clipped.geometry.area
+                for _, row in gdf_clipped.sort_values("_area", ascending=False).iterrows():
+                    name = row["RIVER_NAME"] if "RIVER_NAME" in row.index else ""
+                    if not name or name in labeled:
+                        continue
+                    labeled.add(name)
+                    cx, cy = row.geometry.centroid.x, row.geometry.centroid.y
+                    ax.text(
+                        cx, cy, name,
+                        fontsize=10, color="#0a2f55",
+                        ha="center", va="center",
+                        zorder=4,
+                        path_effects=[
+                            pe.withStroke(linewidth=3.5, foreground="white", alpha=0.95),
+                            pe.Normal(),
+                        ],
+                    )
         except Exception as e:
-            logger.debug(f"River overlay skipped: {e}")
+            logger.warning(f"River overlay skipped: {e}")
 
     def _draw_scale_bar(self, ax, bbox):
         """Draw a simple scale bar in the bottom-left corner."""
@@ -636,7 +667,7 @@ class ExportService:
             import matplotlib.patheffects as _pe
             ax.text(
                 (x0 + x1) / 2, y0 + (north - south) * 0.012, label,
-                ha="center", va="bottom", fontsize=8, color="#222", zorder=11,
+                ha="center", va="bottom", fontsize=10, color="#222", zorder=11,
                 path_effects=[
                     _pe.withStroke(linewidth=3, foreground="white", alpha=0.9),
                     _pe.Normal(),
