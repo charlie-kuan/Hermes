@@ -246,10 +246,10 @@ class ExportService:
             import numpy as np
 
             # Register and apply Noto Sans TC for Chinese support
-            _noto_path = "/Users/charlie/Library/Fonts/NotoSansTC-Regular.otf"
+            _noto_path = Path(__file__).parents[2] / "assets/fonts/NotoSansTC-Regular.otf"
             try:
-                fm.fontManager.addfont(_noto_path)
-                plt.rcParams["font.family"] = fm.FontProperties(fname=_noto_path).get_name()
+                fm.fontManager.addfont(str(_noto_path))
+                plt.rcParams["font.family"] = fm.FontProperties(fname=str(_noto_path)).get_name()
             except Exception:
                 pass
             import rasterio
