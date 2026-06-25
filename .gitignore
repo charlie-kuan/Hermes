@@ -38,11 +38,14 @@ ENV/
 *~
 
 # Data & Cache
+cache/
 data/osm/*
 data/elevation/*
 data/elevation/dem/*.tif
 data/elevation/dem/*.tiff
 data/graphs/*.pkl
+data/river/*.gpkg
+data/river/*.pbf
 !data/osm/.gitkeep
 !data/elevation/.gitkeep
 !data/graphs/.gitkeep

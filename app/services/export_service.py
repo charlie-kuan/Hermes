@@ -564,66 +564,97 @@ class ExportService:
             pass
 
     def _draw_rivers(self, ax, bbox):
-        """Overlay river polygons clipped to bbox."""
-        try:
-            import geopandas as gpd
-            from pathlib import Path
+        """Overlay river lines and polygons clipped to bbox.
 
+        Source priority:
+          1. data/river/osm_rivers.gpkg  (OSM, layers: river_lines / river_polys)
+          2. data/river/riverpoly.shp    (Taiwan government, TWD97 EPSG:3826)
+        """
+        import geopandas as gpd
+        import matplotlib.patheffects as pe
+        from pathlib import Path
+        from shapely.geometry import box as shapely_box
+
+        west, south, east, north = bbox
+        bbox_geom = shapely_box(west, south, east, north)
+
+        def clip(gdf):
+            gdf = gdf.copy()
+            gdf["geometry"] = gdf.intersection(bbox_geom)
+            return gdf[~gdf["geometry"].is_empty]
+
+        def label_rivers(gdf, name_col):
+            labeled = set()
+            gdf = gdf.copy()
+            gdf["_sort"] = gdf.geometry.length + gdf.geometry.area
+            for _, row in gdf.sort_values("_sort", ascending=False).iterrows():
+                name = row.get(name_col, "") or ""
+                if not name or name in labeled:
+                    continue
+                labeled.add(name)
+                c = row.geometry.centroid
+                ax.text(
+                    c.x, c.y, name,
+                    fontsize=10, color="#0a2f55",
+                    ha="center", va="center",
+                    zorder=4,
+                    path_effects=[
+                        pe.withStroke(linewidth=3.5, foreground="white", alpha=0.95),
+                        pe.Normal(),
+                    ],
+                )
+
+        try:
+            gpkg = Path("data/river/osm_rivers.gpkg")
+            if gpkg.exists():
+                # river polygons (riverbank)
+                polys = gpd.read_file(gpkg, layer="river_polys", bbox=(west, south, east, north))
+                if not polys.empty:
+                    polys = clip(polys)
+                if not polys.empty:
+                    polys.plot(ax=ax, facecolor="#1a4f80", edgecolor="#1a4f80",
+                               linewidth=0.3, alpha=0.8, zorder=3)
+
+                # river lines
+                lines = gpd.read_file(gpkg, layer="river_lines", bbox=(west, south, east, north))
+                if not lines.empty:
+                    lines = clip(lines)
+                if not lines.empty:
+                    lines.plot(ax=ax, color="#1a4f80", linewidth=2.0, alpha=0.85, zorder=3)
+
+                # labels: prefer Chinese name, fall back to name
+                combined = gpd.GeoDataFrame(
+                    gpd.pd.concat([polys, lines], ignore_index=True),
+                    crs="EPSG:4326",
+                ) if (not polys.empty or not lines.empty) else gpd.GeoDataFrame()
+                if not combined.empty:
+                    combined["_label"] = combined["name_zh"].where(
+                        combined["name_zh"].astype(bool), combined["name"]
+                    )
+                    label_rivers(combined, "_label")
+                return
+
+            # fallback: government shapefile (TWD97)
             shp = Path("data/river/riverpoly.shp")
             if not shp.exists():
                 return
 
-            west, south, east, north = bbox
             from pyproj import Transformer
-            # Convert bbox to TWD97 (EPSG:3826) for spatial filter
             tr = Transformer.from_crs("EPSG:4326", "EPSG:3826", always_xy=True)
             x_min, y_min = tr.transform(west, south)
             x_max, y_max = tr.transform(east, north)
             gdf = gpd.read_file(shp, bbox=(x_min, y_min, x_max, y_max), encoding="utf-8")
             if gdf.empty:
                 return
-
             gdf = gdf.set_crs("EPSG:3826").to_crs("EPSG:4326")
-
-            # Clip to map bbox so centroids stay within the visible area
-            from shapely.geometry import box as shapely_box
-            bbox_geom = shapely_box(west, south, east, north)
-            gdf_clipped = gdf.copy()
-            gdf_clipped["geometry"] = gdf.intersection(bbox_geom)
-            gdf_clipped = gdf_clipped[~gdf_clipped.is_empty]
-
-            gdf_clipped.plot(
-                ax=ax,
-                facecolor="#1a4f80",
-                edgecolor="#1a4f80",
-                linewidth=0.3,
-                alpha=0.8,
-                zorder=3,
-            )
-
-            # Label each river name once, at the centroid of the largest clipped polygon
-            import matplotlib.patheffects as pe
+            gdf_clipped = clip(gdf)
+            if gdf_clipped.empty:
+                return
+            gdf_clipped.plot(ax=ax, facecolor="#1a4f80", edgecolor="#1a4f80",
+                             linewidth=0.3, alpha=0.8, zorder=3)
             if "RIVER_NAME" in gdf_clipped.columns:
-                labeled = set()
-                # Sort by area descending so largest visible polygon wins when deduplicating
-                gdf_clipped = gdf_clipped.copy()
-                gdf_clipped["_area"] = gdf_clipped.geometry.area
-                for _, row in gdf_clipped.sort_values("_area", ascending=False).iterrows():
-                    name = row["RIVER_NAME"] if "RIVER_NAME" in row.index else ""
-                    if not name or name in labeled:
-                        continue
-                    labeled.add(name)
-                    cx, cy = row.geometry.centroid.x, row.geometry.centroid.y
-                    ax.text(
-                        cx, cy, name,
-                        fontsize=10, color="#0a2f55",
-                        ha="center", va="center",
-                        zorder=4,
-                        path_effects=[
-                            pe.withStroke(linewidth=3.5, foreground="white", alpha=0.95),
-                            pe.Normal(),
-                        ],
-                    )
+                label_rivers(gdf_clipped, "RIVER_NAME")
+
         except Exception as e:
             logger.warning(f"River overlay skipped: {e}")
 
